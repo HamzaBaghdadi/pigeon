@@ -2,6 +2,8 @@ module github.com/HamzaBaghdadi/pigeon
 
 go 1.26.0
 
+toolchain go1.27.4
+
 require (
 	github.com/emersion/go-imap/v2 v2.0.0-beta.9
 	github.com/emersion/go-message v0.18.2
