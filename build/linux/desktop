@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Pigeon
+Comment=A secure, open-source email client
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/pigeon.exe %u
+Terminal=false
+Type=Application
+Icon=pigeon.exe
+Categories=Utility;
+StartupWMClass=pigeon.exe
+
+ 

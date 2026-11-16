@@ -1,0 +1,80 @@
+name: Release
+
+# Runs when a version tag is pushed, e.g.:  git tag v0.2.0 && git push origin v0.2.0
+# Produces a DRAFT GitHub release; review it and click "Publish" yourself.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write      # create the draft release
+  id-token: write      # sign build provenance
+  attestations: write  # publish build provenance
+
+jobs:
+  windows:
+    name: Windows release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+
+      - name: Test
+        shell: bash
+        run: |
+          mkdir -p frontend/dist && echo ok > frontend/dist/index.html  # placeholder; the real UI is built below
+          go test ./...
+
+      # The Google OAuth client comes from repository secrets and is written to a
+      # gitignored file just for this build. It is never committed or printed.
+      - name: Embed Sign in with Google client
+        env:
+          PIGEON_GOOGLE_CLIENT_ID: ${{ secrets.PIGEON_GOOGLE_CLIENT_ID }}
+          PIGEON_GOOGLE_CLIENT_SECRET: ${{ secrets.PIGEON_GOOGLE_CLIENT_SECRET }}
+        run: go run ./scripts/embed-credentials
+
+      - name: Build installer
+        run: wails3 package INSTALL_SCOPE=user
+
+      - name: Remove embedded client from the workspace
+        if: always()
+        run: go run ./scripts/embed-credentials -clean
+
+      - name: Prepare release files
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item bin/pigeon-amd64-installer.exe "dist/Pigeon-$tag-windows-setup.exe"
+          Compress-Archive -Path bin/pigeon.exe -DestinationPath "dist/Pigeon-$tag-windows-portable.zip"
+          Get-ChildItem dist | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Out-File dist/SHA256SUMS.txt -Encoding ascii
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.exe
+            dist/*.zip
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release create $tag (Get-ChildItem dist).FullName `
+            --draft --generate-notes --title "Pigeon $tag"

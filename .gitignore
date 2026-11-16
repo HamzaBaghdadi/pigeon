@@ -1,0 +1,28 @@
+# Build output
+bin/
+.task/
+.wails/
+*.syso
+/dist/
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+.npm-install.log
+
+# Secrets must never be committed
+services/release_credentials.go
+.env
+.env.*
+*.pfx
+*.p12
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
