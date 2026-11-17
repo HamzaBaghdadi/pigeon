@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pigeon: a private, open-source email app for Windows</title>
+  <meta name="description" content="Pigeon is a free, open-source email client for Windows. Gmail, iCloud, Yahoo and any IMAP account in one fast inbox, with your mail stored on your own computer.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111215" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pigeon: email that stays yours">
+  <meta property="og:description" content="A free, open-source email client for Windows. Your mail stays on your computer.">
+  <link rel="icon" href="assets/pigeon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="assets/pigeon-180.png">
+  <link rel="preload" href="assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="./" aria-label="Pigeon home">
+        <img src="assets/pigeon-256.png" alt="" width="32" height="32">
+        Pigeon
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a class="hide-sm" href="#features">Features</a>
+        <a class="hide-sm" href="#google">Your data</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+      </nav>
+      <a class="btn btn-primary btn-sm" href="https://github.com/HamzaBaghdadi/pigeon/releases/latest">Download</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow"><span class="dot">Free</span> Open-source email for Windows</span>
+          <h1 id="hero-title">Email that stays <span class="accent">yours.</span></h1>
+          <p class="lede">
+            Pigeon is a fast, private email app for Gmail, iCloud, Yahoo and any IMAP account.
+            Your mail is stored on your computer, not on our servers. We don't have any.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://github.com/HamzaBaghdadi/pigeon/releases/latest">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+              Download for Windows
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/HamzaBaghdadi/pigeon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>
+              View the source
+            </a>
+          </div>
+          <p class="fineprint">Free forever · Apache 2.0 license · Windows 10 and 11</p>
+        </div>
+
+        <!-- A drawing of the app in HTML and CSS: sharp at any size, follows light/dark. -->
+        <div class="mock" role="img" aria-label="Pigeon's mailbox: folders on the left, the message list in the middle and the open email on the right.">
+          <div class="mock-titlebar" aria-hidden="true">
+            <img src="assets/pigeon-32.png" alt="" width="16" height="16">
+            Pigeon
+            <div class="mock-controls">
+              <span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 6h8"/></svg></span>
+              <span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="2.5" width="7" height="7" rx="1"/></svg></span>
+              <span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="m3 3 6 6M9 3 3 9"/></svg></span>
+            </div>
+          </div>
+          <div class="mock-body" aria-hidden="true">
+            <div class="mock-side">
+              <div class="mock-compose">Compose</div>
+              <div class="mock-folder active">Inbox <b>3</b></div>
+              <div class="mock-folder">Starred</div>
+              <div class="mock-folder">Sent</div>
+              <div class="mock-folder">Drafts</div>
+              <div class="mock-folder">Archive</div>
+              <div class="mock-label">Accounts</div>
+              <div class="mock-acct"><i></i> Personal</div>
+              <div class="mock-acct work"><i></i> Work</div>
+              <div class="mock-acct side"><i></i> Side project</div>
+            </div>
+            <div class="mock-list">
+              <div class="mock-search">Search mail</div>
+              <div class="mock-row selected unread c-work">
+                <div class="top"><span class="from">Maya Chen</span><span class="time">9:41</span></div>
+                <div class="subj">Roadmap review: notes</div>
+                <div class="snip">Thanks everyone for today. Here are the</div>
+              </div>
+              <div class="mock-row unread c-personal">
+                <div class="top"><span class="from">Design Weekly</span><span class="time">8:15</span></div>
+                <div class="subj">Five tools worth trying</div>
+                <div class="snip">Our picks this week, plus a short read</div>
+              </div>
+              <div class="mock-row c-work">
+                <div class="top"><span class="from">Omar Haddad</span><span class="time">Mon</span></div>
+                <div class="subj">Can you review my draft?</div>
+                <div class="snip">No rush. It's the section on onboarding</div>
+              </div>
+              <div class="mock-row c-side">
+                <div class="top"><span class="from">Lena Fischer</span><span class="time">Sun</span></div>
+                <div class="subj">Photos from the trip</div>
+                <div class="snip">Finally sorted them. A few are really</div>
+              </div>
+            </div>
+            <div class="mock-reader">
+              <h4>Roadmap review: notes</h4>
+              <div class="mock-sender">
+                <span class="mock-avatar">MC</span>
+                <span><strong>Maya Chen</strong><small>to Work</small></span>
+              </div>
+              <div class="mock-card">
+                <p>Hi team,</p>
+                <p>Thanks for the session today. Search ships first, then the unified inbox next sprint.</p>
+                <p>The deck is attached.</p>
+              </div>
+              <span class="mock-chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m21 15-5-5L5 21"/></svg>
+                Remote images blocked
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="facts">
+      <div class="container">
+        <ul>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>
+            Your mail stays on your computer
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c7 0 10 7 10 7a17 17 0 0 1-3.2 4.2"/><path d="M6.6 6.6A17 17 0 0 0 2 12s3 7 10 7a10.8 10.8 0 0 0 5.4-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+            Tracking pixels blocked by default
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            Passwords kept in Windows Credential Manager
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>
+            No ads, no analytics, no account with us
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <section id="features" aria-labelledby="features-title">
+      <div class="container">
+        <div class="section-head">
+          <h2 id="features-title">Everything you need, nothing watching you</h2>
+          <p>A calm, quick inbox for all your accounts, built so that only you and your mail provider ever see your email.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg></div>
+            <h3>Stored on your computer</h3>
+            <p>Pigeon keeps a copy of your mail in a database on your own PC, so it opens instantly and works offline. Nothing goes through our servers.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m21 15-5-5L5 21"/></svg></div>
+            <h3>Trackers stay out</h3>
+            <p>Remote images, which senders use to see when you open their email, wait for your OK. Scripts in emails never run.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+            <h3>Secure sign-in</h3>
+            <p>Sign in with Google happens on Google's own page, so Pigeon never sees your password. Other accounts use app passwords, kept in Windows Credential Manager.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+            <h3>New mail, instantly</h3>
+            <p>Push delivery shows new messages the moment they arrive, with a notification. Pigeon can keep running quietly in the tray.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+            <h3>Fast search</h3>
+            <p>Full-text search across all accounts, even offline. When you need older mail, search your whole mailbox on the server.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg></div>
+            <h3>One inbox for everything</h3>
+            <p>Gmail, iCloud, Yahoo, Fastmail and any IMAP account together, with all your folders and labels, keyboard shortcuts and undo.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 11v4"/><path d="M12 18h.01"/></svg></div>
+            <h3>Careful with attachments</h3>
+            <p>Files that can run code are flagged and never opened directly. Saved attachments are marked as downloaded, so Windows scans them.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.9 5.2L19 9.5l-4.1 3 1.4 5.5L12 15l-4.3 3 1.4-5.5-4.1-3 5.1-1.3z"/></svg></div>
+            <h3>Make it yours</h3>
+            <p>Three themes, each in light and dark: the clean default, soft pastel Blossom, and Gilded, a dark-fantasy look with a glowing golden tree.</p>
+          </article>
+          <article class="card">
+            <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div>
+            <h3>Signed updates</h3>
+            <p>Pigeon updates itself in the background and only installs updates signed with the project's key. Anyone can check how each release was built.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="google" aria-labelledby="google-title">
+      <div class="container">
+        <div class="panel">
+          <div class="panel-grid">
+            <div>
+              <h2 id="google-title">Pigeon and your Google account</h2>
+              <p class="intro">
+                When you choose <strong>Sign in with Google</strong>, Pigeon asks Google for the permissions on the right.
+                They're used only to show, organize and send your email inside the app, on your computer.
+              </p>
+              <ul class="checks">
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Your Gmail data travels directly between your computer and Google. It never passes through a Pigeon server.</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Your data is never sold, shared or used for ads, and no person reads your mail.</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Your data is never used to train AI or machine-learning models.</span></li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg><span>Remove the account in Pigeon to delete its copy from your computer, or revoke access any time at <a href="https://myaccount.google.com/permissions">Google account permissions</a>.</span></li>
+              </ul>
+              <p class="intro">Details are in the <a href="privacy.html#google">privacy policy</a>.</p>
+            </div>
+            <ul class="perm" aria-label="Permissions Pigeon requests">
+              <li>
+                <strong>Read, compose, send and manage your Gmail</strong>
+                <code>https://mail.google.com/</code>
+                <span>Lets Pigeon connect to Gmail over IMAP and SMTP to download, organize and send your mail. Gmail only lets email apps connect with this permission.</span>
+              </li>
+              <li>
+                <strong>Your email address</strong>
+                <code>email</code>
+                <span>Shown on the account in Pigeon and used as your Gmail sign-in name.</span>
+              </li>
+              <li>
+                <strong>Your name</strong>
+                <code>openid profile</code>
+                <span>Fills in the name people see on email you send. You can change it in Settings.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" aria-labelledby="cta-title">
+      <div class="container">
+        <img src="assets/pigeon-256.png" alt="" width="72" height="72">
+        <h2 id="cta-title">Get Pigeon</h2>
+        <p>Free and open source, for Windows 10 and 11. Read every line of code on GitHub.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="https://github.com/HamzaBaghdadi/pigeon/releases/latest">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            Download for Windows
+          </a>
+          <a class="btn btn-secondary" href="https://github.com/HamzaBaghdadi/pigeon">View the source</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>© 2026 Hamza Baghdadi · Pigeon is open source under the Apache License 2.0.</span>
+      <nav aria-label="Footer">
+        <a href="privacy.html">Privacy policy</a>
+        <a href="terms.html">Terms of use</a>
+        <a href="https://github.com/HamzaBaghdadi/pigeon">Source code</a>
+        <a href="https://github.com/HamzaBaghdadi/pigeon/issues">Contact</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>
