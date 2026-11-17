@@ -2,11 +2,13 @@ package oauth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -162,5 +164,72 @@ func TestTokenSourceRefreshAndExpiry(t *testing.T) {
 	_, err = TokenSource(context.Background(), p, Client{ID: "cid"}, revoked, nil).Token()
 	if !errors.Is(err, ErrExpired) {
 		t.Fatalf("err = %v, want ErrExpired", err)
+	}
+}
+
+func fakeIDToken(claims map[string]any) string {
+	b, _ := json.Marshal(claims)
+	return "eyJhbGciOiJSUzI1NiJ9." + base64.RawURLEncoding.EncodeToString(b) + ".sig"
+}
+
+// TestSignInIDTokenPublicClient covers the Microsoft shape: a public client
+// (no secret), a localhost redirect with no path, and identity from the ID token.
+func TestSignInIDTokenPublicClient(t *testing.T) {
+	var sentSecret bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		_, sentSecret = r.Form["client_secret"]
+		if r.Form.Get("code") != "good-code" || r.Form.Get("code_verifier") == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "at", "refresh_token": "rt", "token_type": "Bearer", "expires_in": 3600,
+			"id_token": fakeIDToken(map[string]any{"preferred_username": "me@outlook.com", "name": "Me"}),
+		})
+	}))
+	defer srv.Close()
+	p := Provider{Name: "MS", AuthURL: srv.URL + "/auth", TokenURL: srv.URL, RedirectHost: "localhost", RedirectPath: "/"}
+
+	var seen url.Values
+	res, err := SignIn(context.Background(), p, Client{ID: "cid"}, "", browser(t, "good-code", "", false, &seen))
+	if err != nil {
+		t.Fatalf("SignIn: %v", err)
+	}
+	if res.Email != "me@outlook.com" || res.Name != "Me" {
+		t.Errorf("identity = %q %q", res.Email, res.Name)
+	}
+	if sentSecret {
+		t.Error("a public client must not send client_secret")
+	}
+	r, _ := url.Parse(seen.Get("redirect_uri"))
+	if r.Hostname() != "localhost" || r.Path != "/" || r.Port() == "" {
+		t.Errorf("redirect = %s, want http://localhost:<port>/", seen.Get("redirect_uri"))
+	}
+}
+
+func TestIDTokenIdentity(t *testing.T) {
+	tok := (&oauth2.Token{}).WithExtra(map[string]any{"id_token": fakeIDToken(map[string]any{"email": "a@b.com", "preferred_username": "other@b.com"})})
+	if e, _, err := idTokenIdentity(tok); err != nil || e != "a@b.com" {
+		t.Errorf("email claim should win: %q %v", e, err)
+	}
+	tok = (&oauth2.Token{}).WithExtra(map[string]any{"id_token": fakeIDToken(map[string]any{"preferred_username": "+15550100"})})
+	if _, _, err := idTokenIdentity(tok); err == nil {
+		t.Error("a phone-number username is not an email address")
+	}
+	if _, _, err := idTokenIdentity(&oauth2.Token{}); err == nil {
+		t.Error("missing ID token must fail")
+	}
+}
+
+func TestProviderError(t *testing.T) {
+	err := providerError("Microsoft", "invalid_request", "AADSTS65001: The user or administrator has not consented.\r\nTrace ID: x")
+	if !strings.Contains(err.Error(), "administrator") {
+		t.Errorf("admin consent message = %v", err)
+	}
+	err = providerError("Microsoft", "invalid_request", "AADSTS50020: Something.\r\nTrace ID: x")
+	if strings.Contains(err.Error(), "Trace") {
+		t.Errorf("trace IDs should be trimmed: %v", err)
 	}
 }

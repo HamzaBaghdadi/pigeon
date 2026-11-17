@@ -143,6 +143,7 @@ func (s *AccountService) RemoveAccount(id string) error {
 	_ = secrets.Delete(passwordKey(id))
 	_ = secrets.Delete(oauthKey(id))
 	s.core.google.forget(id)
+	s.core.microsoft.forget(id)
 	emit(EventMailChanged, "")
 	return nil
 }

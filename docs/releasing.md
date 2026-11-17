@@ -54,6 +54,18 @@ read anyone's mail without that approval. We still keep it out of the
 repository so it isn't copied into forks and other projects, and so it can be
 rotated without a code change.
 
+## One-time setup: Sign in with Microsoft for release users
+
+Register the app as described in [microsoft-sign-in.md](microsoft-sign-in.md),
+then add one more repository secret:
+
+| Name | Value |
+|---|---|
+| `PIGEON_MICROSOFT_CLIENT_ID` | the Application (client) ID |
+
+There is no Microsoft client secret: the registration is a public client. If
+this secret is missing, releases still build and simply hide the button.
+
 ## One-time setup: signed auto-updates
 
 Installed copies of Pigeon check GitHub Releases every 6 hours (and 15 seconds
@@ -111,5 +123,6 @@ has a `sign` task for when one is available.
 ## If a secret leaks
 
 1. In Google Cloud → Clients, delete the leaked client and create a new one.
+   (The Microsoft client ID isn't a secret, so there's nothing to rotate there.)
 2. Update the GitHub secrets and publish a new release.
 3. Existing users sign in again with **Reconnect** in Settings → Accounts.

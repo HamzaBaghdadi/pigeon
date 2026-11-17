@@ -41,11 +41,17 @@ var presets = []preset{
 		PasswordHint: "Use a Google app password, not your normal password. It needs 2-Step Verification turned on.",
 		HelpURL:      "https://myaccount.google.com/apppasswords",
 	}},
-	{domains: []string{"outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.fr", "hotmail.co.uk", "hotmail.fr"}, Settings: Settings{
+	{domains: []string{
+		"outlook.com", "hotmail.com", "live.com", "msn.com", "passport.com",
+		"outlook.fr", "outlook.de", "outlook.es", "outlook.it", "outlook.sa", "outlook.co.uk",
+		"hotmail.co.uk", "hotmail.fr", "hotmail.de", "hotmail.es", "hotmail.it",
+		"live.co.uk", "live.fr", "live.de", "live.nl", "live.ca",
+	}, Settings: Settings{
 		Provider: mail.ProviderOutlook, Label: "Outlook.com",
 		IMAPHost: "outlook.office365.com", IMAPPort: 993, IMAPSecurity: "tls",
 		SMTPHost: "smtp-mail.outlook.com", SMTPPort: 587, SMTPSecurity: "starttls",
-		Warning: "Microsoft has turned off password sign-in for most Outlook.com accounts. Sign in with Microsoft is coming to Pigeon soon.",
+		// The UI points to Sign in with Microsoft when this build offers it.
+		Warning: "Microsoft has turned off password sign-in for most Outlook.com accounts.",
 	}},
 	{domains: []string{"yahoo.com", "ymail.com", "yahoo.co.uk", "yahoo.fr", "rocketmail.com"}, Settings: Settings{
 		Provider: mail.ProviderIMAP, Label: "Yahoo Mail",

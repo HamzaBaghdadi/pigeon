@@ -24,7 +24,7 @@ type Account struct {
 	Color string `json:"color"`
 	// Demo marks sample data (never synced, removable in one step).
 	Demo bool `json:"demo"`
-	// Auth is how the account signs in: "password" or "google".
+	// Auth is how the account signs in: "password", "google" or "microsoft".
 	Auth string `json:"auth"`
 }
 

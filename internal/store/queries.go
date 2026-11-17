@@ -28,8 +28,9 @@ type Account struct {
 
 // How an account signs in (mail.Account.Auth).
 const (
-	AuthPassword = "password"
-	AuthGoogle   = "google"
+	AuthPassword  = "password"
+	AuthGoogle    = "google"
+	AuthMicrosoft = "microsoft"
 )
 
 // ---- accounts ----

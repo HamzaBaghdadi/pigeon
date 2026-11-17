@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emersion/go-sasl"
@@ -33,6 +34,10 @@ var insecure = false
 
 // ErrAuth means the server rejected the credentials.
 var ErrAuth = errors.New("the mail server rejected the sign-in for sending")
+
+// ErrSMTPAuthDisabled means a Microsoft 365 organization blocks sending from
+// mail apps; only its admin can allow it.
+var ErrSMTPAuthDisabled = errors.New("your organization has turned off sending from mail apps (SMTP AUTH). Ask your IT admin to enable it for your mailbox")
 
 // Send delivers raw to the recipients, with from as the envelope sender.
 func Send(cfg Config, from string, to []string, raw []byte) error {
@@ -75,6 +80,10 @@ func Send(cfg Config, from string, to []string, raw []byte) error {
 	if err := c.Auth(auth); err != nil {
 		var se *smtp.SMTPError
 		if errors.As(err, &se) && (se.Code == 535 || se.Code == 534) {
+			// Microsoft 365 tenants can turn off authenticated SMTP (5.7.139).
+			if strings.Contains(se.Message, "SmtpClientAuthentication is disabled") {
+				return ErrSMTPAuthDisabled
+			}
 			return ErrAuth
 		}
 		return fmt.Errorf("couldn't sign in to the outgoing server: %w", err)

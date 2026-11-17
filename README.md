@@ -112,7 +112,7 @@ Pigeon's palette comes from its logo:
 - [x] Composer: new, reply, reply all, forward, attachments, contact suggestions, undo send
 - [ ] Drafts saved to the server, rich text formatting
 - [x] Sign in with Google (OAuth 2.0 + PKCE, XOAUTH2). [Setup guide](docs/google-sign-in.md)
-- [ ] Sign in with Microsoft (Outlook.com, Microsoft 365)
+- [x] Sign in with Microsoft (Outlook.com, Microsoft 365). [Setup guide](docs/microsoft-sign-in.md)
 - [x] Unified inbox actions: archive, delete, star, read/unread, undo
 - [x] All your folders and labels; move to any folder (M)
 - [x] Attachments: open, save, forward; embedded images shown

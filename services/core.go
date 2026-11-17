@@ -38,10 +38,11 @@ type SyncStatus struct {
 
 // Core is shared state behind MailService and AccountService.
 type Core struct {
-	store  *store.Store
-	prefs  *settings.Store
-	engine *imapsync.Engine
-	google *googleAuth
+	store     *store.Store
+	prefs     *settings.Store
+	engine    *imapsync.Engine
+	google    *oauthAuth
+	microsoft *oauthAuth
 
 	mu      sync.Mutex
 	status  SyncStatus
@@ -62,19 +63,32 @@ func passwordKey(accountID string) string { return "account:" + accountID + ":pa
 // keychain: a password, or an OAuth token that is refreshed as needed.
 func NewCore(st *store.Store, prefs *settings.Store) *Core {
 	c := &Core{
-		store:   st,
-		prefs:   prefs,
-		google:  newGoogleAuth(prefs),
-		status:  SyncStatus{Errors: map[string]string{}},
-		trigger: make(chan struct{}, 1),
+		store:     st,
+		prefs:     prefs,
+		google:    newGoogleAuth(prefs),
+		microsoft: newMicrosoftAuth(),
+		status:    SyncStatus{Errors: map[string]string{}},
+		trigger:   make(chan struct{}, 1),
 	}
 	c.engine = imapsync.NewEngine(st, c.credentials)
 	return c
 }
 
+// oauthFor returns the OAuth handler for an account's sign-in kind, or nil
+// for password accounts.
+func (c *Core) oauthFor(auth string) *oauthAuth {
+	switch auth {
+	case store.AuthGoogle:
+		return c.google
+	case store.AuthMicrosoft:
+		return c.microsoft
+	}
+	return nil
+}
+
 func (c *Core) credentials(a store.Account) (imapsync.Credentials, error) {
-	if a.Auth == store.AuthGoogle {
-		tok, err := c.google.accessToken(a.ID)
+	if o := c.oauthFor(a.Auth); o != nil {
+		tok, err := o.accessToken(a.ID)
 		return imapsync.Credentials{AccessToken: tok}, err
 	}
 	pw, err := secrets.Get(passwordKey(a.ID))

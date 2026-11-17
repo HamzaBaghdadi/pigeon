@@ -53,14 +53,17 @@ jobs:
             exit 1
           fi
 
-      # The Google OAuth client comes from repository secrets and is written to a
-      # gitignored file just for this build. It is never committed or printed.
-      - name: Embed Sign in with Google client
+      # The Google and Microsoft OAuth clients come from repository secrets and
+      # are written to a gitignored file just for this build. They are never
+      # committed or printed. Google is required; Microsoft is optional until
+      # its secret is added (the button is hidden without it).
+      - name: Embed sign-in clients
         env:
           PIGEON_GOOGLE_CLIENT_ID: ${{ secrets.PIGEON_GOOGLE_CLIENT_ID }}
           PIGEON_GOOGLE_CLIENT_SECRET: ${{ secrets.PIGEON_GOOGLE_CLIENT_SECRET }}
+          PIGEON_MICROSOFT_CLIENT_ID: ${{ secrets.PIGEON_MICROSOFT_CLIENT_ID }}
           PIGEON_VERSION: ${{ github.ref_name }}
-        run: go run ./scripts/embed-credentials
+        run: go run ./scripts/embed-credentials -require-google
 
       - name: Build installer
         run: wails3 package INSTALL_SCOPE=user

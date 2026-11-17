@@ -1,5 +1,5 @@
-// Package oauth signs users in with their email provider (Google today,
-// Microsoft next) using the OAuth 2.0 flow for native apps (RFC 8252):
+// Package oauth signs users in with their email provider (Google or
+// Microsoft) using the OAuth 2.0 flow for native apps (RFC 8252):
 //
 //   - The provider's own sign-in page opens in the user's browser, so Pigeon
 //     never sees the account password.
@@ -19,6 +19,7 @@ import (
 	"html"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -26,13 +27,34 @@ import (
 
 // Provider describes an OAuth identity provider for email.
 type Provider struct {
-	Name        string // shown to users, e.g. "Google"
-	AuthURL     string
-	TokenURL    string
+	Name     string // shown to users, e.g. "Google"
+	AuthURL  string
+	TokenURL string
+	// UserInfoURL returns the account's address and name. When empty, they
+	// are read from the ID token returned with the access token instead.
 	UserInfoURL string
 	Scopes      []string
 	// Extra parameters for the authorization request.
 	AuthParams map[string]string
+	// RedirectHost and RedirectPath shape the loopback redirect URI and must
+	// match the app registration (the port is always random). Defaults:
+	// 127.0.0.1 and /callback.
+	RedirectHost string
+	RedirectPath string
+}
+
+func (p Provider) redirectHost() string {
+	if p.RedirectHost != "" {
+		return p.RedirectHost
+	}
+	return "127.0.0.1"
+}
+
+func (p Provider) redirectPath() string {
+	if p.RedirectPath != "" {
+		return p.RedirectPath
+	}
+	return "/callback"
 }
 
 // Google requests full IMAP/SMTP access (the only scope Gmail's IMAP accepts)
@@ -45,6 +67,26 @@ var Google = Provider{
 	Scopes:      []string{"https://mail.google.com/", "openid", "email", "profile"},
 	// offline + consent: always return a refresh token so sync keeps working.
 	AuthParams: map[string]string{"access_type": "offline", "prompt": "consent"},
+}
+
+// Microsoft covers personal accounts (Outlook.com, Hotmail, Live) and work or
+// school Microsoft 365 accounts (the "common" tenant). It asks for IMAP and
+// SMTP access to Exchange Online, a refresh token, and the account identity.
+// The registration is a public client: no secret, PKCE only. The Azure portal
+// only accepts http://localhost for loopback (the port is ignored when
+// matching), so the redirect uses that host with no path.
+var Microsoft = Provider{
+	Name:     "Microsoft",
+	AuthURL:  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+	TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+	Scopes: []string{
+		"https://outlook.office.com/IMAP.AccessAsUser.All",
+		"https://outlook.office.com/SMTP.Send",
+		"offline_access", "openid", "email", "profile",
+	},
+	AuthParams:   map[string]string{"prompt": "select_account"},
+	RedirectHost: "localhost",
+	RedirectPath: "/",
 }
 
 // Client is the app's registration with a provider. For installed apps the
@@ -86,7 +128,17 @@ func SignIn(ctx context.Context, p Provider, c Client, loginHint string, openBro
 		return nil, fmt.Errorf("couldn't start the sign-in listener: %w", err)
 	}
 	defer ln.Close()
-	redirect := fmt.Sprintf("http://127.0.0.1:%d/callback", ln.Addr().(*net.TCPAddr).Port)
+	port := ln.Addr().(*net.TCPAddr).Port
+	listeners := []net.Listener{ln}
+	if p.redirectHost() == "localhost" {
+		// "localhost" may resolve to ::1 first; listen there too when we can.
+		if ln6, err := net.Listen("tcp", fmt.Sprintf("[::1]:%d", port)); err == nil {
+			defer ln6.Close()
+			listeners = append(listeners, ln6)
+		}
+	}
+	path := p.redirectPath()
+	redirect := fmt.Sprintf("http://%s:%d%s", p.redirectHost(), port, path)
 	cfg := p.config(c, redirect)
 
 	state := randomString()
@@ -108,7 +160,7 @@ func SignIn(ctx context.Context, p Provider, c Client, loginHint string, openBro
 	srv := &http.Server{
 		ReadHeaderTimeout: 10 * time.Second,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/callback" {
+			if r.URL.Path != path {
 				http.NotFound(w, r)
 				return
 			}
@@ -120,7 +172,7 @@ func SignIn(ctx context.Context, p Provider, c Client, loginHint string, openBro
 			case q.Get("error") == "access_denied":
 				res.err = ErrCanceled
 			case q.Get("error") != "":
-				res.err = fmt.Errorf("%s returned an error: %s", p.Name, q.Get("error"))
+				res.err = providerError(p.Name, q.Get("error"), q.Get("error_description"))
 			case q.Get("code") == "":
 				res.err = errors.New("sign-in response had no authorization code")
 			default:
@@ -133,7 +185,9 @@ func SignIn(ctx context.Context, p Provider, c Client, loginHint string, openBro
 			}
 		}),
 	}
-	go srv.Serve(ln)
+	for _, l := range listeners {
+		go srv.Serve(l)
+	}
 	defer srv.Close()
 
 	if err := openBrowser(authURL); err != nil {
@@ -162,11 +216,70 @@ func SignIn(ctx context.Context, p Provider, c Client, loginHint string, openBro
 	if tok.RefreshToken == "" {
 		return nil, fmt.Errorf("%s didn't grant offline access. Try again", p.Name)
 	}
-	email, name, err := userInfo(ctx, p, tok)
+	var email, name string
+	if p.UserInfoURL != "" {
+		email, name, err = userInfo(ctx, p, tok)
+	} else {
+		email, name, err = idTokenIdentity(tok)
+	}
 	if err != nil {
 		return nil, err
 	}
 	return &Result{Token: tok, Email: email, Name: name}, nil
+}
+
+// providerError turns an OAuth error redirect into a message people can act on.
+func providerError(provider, code, desc string) error {
+	// Microsoft: these AADSTS codes mean an admin must approve the app first.
+	for _, c := range []string{"AADSTS65001", "AADSTS90094", "AADSTS90099"} {
+		if strings.Contains(desc, c) {
+			return errors.New("your organization requires an administrator to approve Pigeon before you can sign in. Ask your IT admin to allow it")
+		}
+	}
+	if desc == "" {
+		return fmt.Errorf("%s returned an error: %s", provider, code)
+	}
+	// Keep the first line; Microsoft appends trace and correlation IDs.
+	if i := strings.IndexAny(desc, "\r\n"); i > 0 {
+		desc = desc[:i]
+	}
+	if len(desc) > 300 {
+		desc = desc[:300]
+	}
+	return fmt.Errorf("%s returned an error: %s", provider, desc)
+}
+
+// idTokenIdentity reads the address and name from the OpenID Connect ID token
+// that came back with the access token. It arrived directly from the
+// provider's token endpoint over TLS, so its signature doesn't need checking
+// here (OpenID Connect Core 1.0, section 3.1.3.7).
+func idTokenIdentity(tok *oauth2.Token) (email, name string, err error) {
+	bad := errors.New("couldn't read your account details from the sign-in")
+	raw, _ := tok.Extra("id_token").(string)
+	parts := strings.Split(raw, ".")
+	if len(parts) != 3 {
+		return "", "", bad
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", "", bad
+	}
+	var claims struct {
+		Email             string `json:"email"`
+		PreferredUsername string `json:"preferred_username"`
+		Name              string `json:"name"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", "", bad
+	}
+	email = strings.TrimSpace(claims.Email)
+	if email == "" && strings.Contains(claims.PreferredUsername, "@") {
+		email = strings.TrimSpace(claims.PreferredUsername)
+	}
+	if email == "" {
+		return "", "", errors.New("this account has no email address")
+	}
+	return email, strings.TrimSpace(claims.Name), nil
 }
 
 func userInfo(ctx context.Context, p Provider, tok *oauth2.Token) (email, name string, err error) {
