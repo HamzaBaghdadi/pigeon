@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, type Account, type Folder, type FolderRole, type SyncStatus, type UpdateStatus } from "@/lib/api";
+import { Tip } from "./Tip";
 import type { Section } from "./SettingsDialog";
 
 const folderItems: { role: string; label: string; icon: LucideIcon; count?: boolean }[] = [
@@ -64,23 +65,19 @@ export default function Sidebar(props: Props) {
       .reduce((n, f) => n + f.unread, 0);
 
   return (
-    <aside className="flex min-w-0 flex-1 flex-col bg-sidebar">
-      <div className="flex h-[52px] shrink-0 items-center gap-2 px-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/pigeon.png" alt="" className="h-[22px] w-[22px]" draggable={false} />
-        <span className="text-[14px] font-semibold tracking-[-0.01em]">Pigeon</span>
-      </div>
-
-      <div className="px-3 pb-3">
+    <aside className="flex min-w-0 flex-1 flex-col bg-pane-side">
+      {/* Brand lives in the title bar; Compose takes the top row (aligned with Search). */}
+      <div className="flex h-[52px] shrink-0 items-center px-3">
+        <Tip label="New message" shortcut="C" side="right">
         <button
-          title="Compose (C)"
           onClick={props.onCompose}
-          className="flex h-8 w-full items-center gap-2 rounded-md bg-primary px-3 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-primary-hover active:translate-y-px"
+          className="flex h-8 w-full items-center gap-2 rounded-md bg-primary px-3 text-[13px] font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:translate-y-px"
         >
           <PenSquare size={15} strokeWidth={2} aria-hidden />
           <span className="flex-1 text-left">Compose</span>
-          <span className="text-[11px] font-normal text-white/60">C</span>
+          <span className="text-[11px] font-normal text-primary-foreground/60">C</span>
         </button>
+        </Tip>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Mailboxes">
@@ -160,24 +157,26 @@ export default function Sidebar(props: Props) {
       <div className="flex h-11 shrink-0 items-center gap-1 border-t border-border pr-2.5 pl-4 text-[12px] text-subtle">
         <SyncLine sync={props.sync} accounts={accounts} onShowErrors={() => onOpenSettings("accounts")} />
         {accounts.some((a) => !a.demo) && (
-          <button
-            onClick={props.onSyncNow}
-            disabled={props.sync?.syncing}
-            className="rounded-md p-1.5 transition-colors duration-150 hover:bg-hover hover:text-text disabled:opacity-40"
-            title="Check for new mail"
-            aria-label="Check for new mail"
-          >
-            <RotateCw size={14} strokeWidth={1.75} />
-          </button>
+          <Tip label="Check for new mail" side="top">
+            <button
+              onClick={props.onSyncNow}
+              disabled={props.sync?.syncing}
+              className="rounded-md p-1.5 transition-colors duration-150 hover:bg-hover hover:text-text disabled:opacity-40"
+              aria-label="Check for new mail"
+            >
+              <RotateCw size={14} strokeWidth={1.75} />
+            </button>
+          </Tip>
         )}
-        <button
-          onClick={() => onOpenSettings()}
-          className="rounded-md p-1.5 transition-colors duration-150 hover:bg-hover hover:text-text"
-          title="Settings (Ctrl+,)"
-          aria-label="Settings"
-        >
-          <Settings size={15} strokeWidth={1.75} />
-        </button>
+        <Tip label="Settings" shortcut="Ctrl ," side="top">
+          <button
+            onClick={() => onOpenSettings()}
+            className="rounded-md p-1.5 transition-colors duration-150 hover:bg-hover hover:text-text"
+            aria-label="Settings"
+          >
+            <Settings size={15} strokeWidth={1.75} />
+          </button>
+        </Tip>
       </div>
     </aside>
   );
@@ -207,9 +206,9 @@ function AccountRow(props: {
           <ChevronRight size={12} strokeWidth={2} className={`transition-transform duration-150 ${props.expanded ? "rotate-90" : ""}`} />
         </button>
       )}
+      <MaybeTip label={props.sub}>
       <button
         onClick={props.onClick}
-        title={props.sub}
         aria-current={props.active ? "true" : undefined}
         className={`flex h-[30px] w-full items-center gap-2.5 rounded-md px-2.5 text-[13px] transition-colors duration-150 ${
           props.active ? "bg-active font-medium text-text" : "text-muted hover:bg-hover hover:text-text"
@@ -225,6 +224,7 @@ function AccountRow(props: {
         <span className="flex-1 truncate text-left">{props.label}</span>
         {props.count > 0 && <span className="text-[12px] text-subtle tabular-nums">{props.count}</span>}
       </button>
+      </MaybeTip>
       {props.children}
     </li>
   );
@@ -234,9 +234,9 @@ function FolderRow({ folder, active, onClick }: { folder: Folder; active: boolea
   const depth = folder.path.split("/").length - 1;
   return (
     <li>
+      <MaybeTip label={folder.path !== folder.name ? folder.path : undefined}>
       <button
         onClick={onClick}
-        title={folder.path}
         aria-current={active ? "page" : undefined}
         style={{ paddingLeft: 30 + depth * 14 }}
         className={`flex h-[28px] w-full items-center gap-2 rounded-md pr-2.5 text-[12.5px] transition-colors duration-150 ${
@@ -247,6 +247,7 @@ function FolderRow({ folder, active, onClick }: { folder: Folder; active: boolea
         <span className="flex-1 truncate text-left">{folder.name}</span>
         {folder.unread > 0 && <span className="text-[11.5px] text-subtle tabular-nums">{folder.unread}</span>}
       </button>
+      </MaybeTip>
     </li>
   );
 }
@@ -268,10 +269,12 @@ function SyncLine({ sync, accounts, onShowErrors }: { sync: SyncStatus | null; a
   if (errors.length > 0) {
     const name = real.find((a) => a.id === errors[0][0])?.name ?? "an account";
     return (
-      <button onClick={onShowErrors} className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-text" title={errors[0][1]}>
+      <Tip label={errors[0][1] ?? "Sync problem"} side="top">
+      <button onClick={onShowErrors} className="flex min-w-0 flex-1 items-center gap-2 text-left hover:text-text">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-star" aria-hidden />
         <span className="truncate">Couldn&apos;t sync {name}</span>
       </button>
+      </Tip>
     );
   }
   return (
@@ -300,14 +303,14 @@ function UpdateBanner({ update, onInstall, onDetails }: { update: UpdateStatus |
         {ready ? (
           <button
             onClick={onInstall}
-            className="h-7 flex-1 rounded-md bg-primary text-[12.5px] font-medium text-white transition-colors hover:bg-primary-hover"
+            className="h-7 flex-1 rounded-md bg-primary text-[12.5px] font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
           >
             Restart to update
           </button>
         ) : (
           <button
             onClick={() => api.openExternal(update.url)}
-            className="h-7 flex-1 rounded-md bg-primary text-[12.5px] font-medium text-white transition-colors hover:bg-primary-hover"
+            className="h-7 flex-1 rounded-md bg-primary text-[12.5px] font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
           >
             Download
           </button>
@@ -317,5 +320,16 @@ function UpdateBanner({ update, onInstall, onDetails }: { update: UpdateStatus |
         </button>
       </div>
     </div>
+  );
+}
+
+/** Tooltip only when there's something to say (e.g. an account's address). */
+function MaybeTip({ label, children }: { label?: string; children: React.ReactElement }) {
+  return label ? (
+    <Tip label={label} side="right">
+      {children}
+    </Tip>
+  ) : (
+    children
   );
 }

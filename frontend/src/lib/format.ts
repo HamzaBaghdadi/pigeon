@@ -9,6 +9,14 @@ const fullFmt = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",
 });
+const mediumFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const mediumYearFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+/** Reader header date: "Nov 17, 9:49 AM" this year, "Nov 17, 2024" before. */
+export function mediumDate(iso: string): string {
+  const d = new Date(iso);
+  return d.getFullYear() === new Date().getFullYear() ? mediumFmt.format(d) : mediumYearFmt.format(d);
+}
 
 /** Compact list date: 3:42 PM today, "Tue" this week, "Nov 2" otherwise. */
 export function shortDate(iso: string): string {

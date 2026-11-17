@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { Archive, Loader2, Paperclip, Search, Star, Trash2, X } from "lucide-react";
 import type { Account, FolderRole, MessageSummary } from "@/lib/api";
 import { shortDate } from "@/lib/format";
+import { Input } from "@/components/ui/input";
+import { Tip } from "./Tip";
 
 const roleTitle: Record<string, string> = {
   inbox: "Inbox",
@@ -50,7 +52,7 @@ export default function MessageList({ searchRef, ...p }: Props) {
   }, [p.selectedId]);
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col bg-surface" aria-label="Message list">
+    <section className="flex min-w-0 flex-1 flex-col bg-pane-list" aria-label="Message list">
       <div className="flex h-[52px] shrink-0 items-center px-3">
         <label className="relative flex-1">
           <span className="sr-only">Search mail</span>
@@ -60,12 +62,12 @@ export default function MessageList({ searchRef, ...p }: Props) {
             className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-subtle"
             aria-hidden
           />
-          <input
+          <Input
             ref={searchRef}
             value={p.query}
             onChange={(e) => p.onQuery(e.target.value)}
             placeholder="Search"
-            className="h-8 w-full rounded-md border border-border bg-bg pr-16 pl-8 text-[13px] text-text outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
+            className="h-8 bg-bg pr-16 pl-8 text-[13px] md:text-[13px] dark:bg-bg"
           />
           {p.query ? (
             <button
@@ -84,7 +86,7 @@ export default function MessageList({ searchRef, ...p }: Props) {
       </div>
 
       <div className="flex h-9 shrink-0 items-baseline gap-2 border-b border-border px-4">
-        <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{p.folderName ?? roleTitle[p.role] ?? p.role}</h1>
+        <h1 className="display-heading truncate font-display text-[15px] font-semibold tracking-[-0.01em]">{p.folderName ?? roleTitle[p.role] ?? p.role}</h1>
         <span className="truncate text-[12px] text-subtle">
           {p.accountName}
           {unreadCount > 0 && ` · ${unreadCount} unread`}
@@ -150,7 +152,6 @@ function Row(props: {
         <span
           className="absolute inset-y-0 left-0 w-[3px]"
           style={{ background: account.color }}
-          title={account.name}
           aria-label={`Account: ${account.name}`}
         />
       )}
@@ -190,8 +191,8 @@ function Row(props: {
 
 function QuickAction(props: { label: string; icon: React.ReactNode; active?: boolean; onClick: () => void }) {
   return (
+    <Tip label={props.label} side="top">
     <button
-      title={props.label}
       aria-label={props.label}
       onClick={(e) => {
         e.stopPropagation();
@@ -203,6 +204,7 @@ function QuickAction(props: { label: string; icon: React.ReactNode; active?: boo
     >
       {props.icon}
     </button>
+    </Tip>
   );
 }
 

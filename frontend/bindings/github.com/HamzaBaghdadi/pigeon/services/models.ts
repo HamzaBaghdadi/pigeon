@@ -106,6 +106,13 @@ export interface HistoryResult {
 }
 
 /**
+ * MicrosoftSetup describes whether Sign in with Microsoft is available.
+ */
+export interface MicrosoftSetup {
+    "configured": boolean;
+}
+
+/**
  * MoveResult says where a moved message went, so the UI can undo.
  */
 export interface MoveResult {

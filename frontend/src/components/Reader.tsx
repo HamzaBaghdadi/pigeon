@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Archive, FolderInput, Forward, ImageOff, Mail, MailOpen, Reply, ReplyAll, Star, Trash2 } from "lucide-react";
 import { api, errorMessage, type Account, type MessageBody as Body, type MessageSummary } from "@/lib/api";
-import { fullDate, initials } from "@/lib/format";
+import { fullDate, initials, mediumDate } from "@/lib/format";
 import MessageBody from "./MessageBody";
+import { Tip } from "./Tip";
 import Attachments from "./Attachments";
 
 type Props = {
@@ -17,6 +18,7 @@ type Props = {
   onRespond: (m: MessageSummary, mode: "reply" | "replyAll" | "forward") => void;
   onMove: (m: MessageSummary) => void;
   onToast: (text: string, action?: { label: string; run: () => void }, error?: boolean) => void;
+  alwaysShowImages: boolean;
 };
 
 export default function Reader(props: Props) {
@@ -35,9 +37,10 @@ function MessageView({
   onRespond,
   onMove,
   onToast,
+  alwaysShowImages,
 }: Props & { message: MessageSummary }) {
   const [body, setBody] = useState<Body | null>(null);
-  const [allowRemote, setAllowRemote] = useState(false);
+  const [allowRemote, setAllowRemote] = useState(alwaysShowImages);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -57,7 +60,7 @@ function MessageView({
   }, [message.id, attempt]);
 
   return (
-    <main className="flex min-w-[340px] flex-1 flex-col bg-surface">
+    <main className="flex min-w-[340px] flex-1 flex-col bg-pane-main">
       <div className="flex h-[52px] shrink-0 items-center gap-0.5 border-b border-border px-3" role="toolbar" aria-label="Message actions">
         <ToolButton icon={Archive} label="Archive" shortcut="E" onClick={() => onArchive(message)} />
         <ToolButton icon={Trash2} label="Delete" shortcut="#" onClick={() => onTrash(message)} />
@@ -84,7 +87,7 @@ function MessageView({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <article className="mx-auto max-w-[820px] px-8 pt-6 pb-10">
-          <h2 className="selectable text-[20px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance">
+          <h2 className="display-heading selectable font-display text-[20px] leading-[1.3] font-semibold tracking-[-0.015em] text-balance">
             {message.subject || "(no subject)"}
           </h2>
 
@@ -114,9 +117,11 @@ function MessageView({
                 )}
               </div>
             </div>
-            <time dateTime={message.date} className="shrink-0 pt-0.5 text-[12px] text-subtle tabular-nums">
-              {fullDate(message.date)}
-            </time>
+            <Tip label={fullDate(message.date)}>
+              <time dateTime={message.date} className="shrink-0 pt-0.5 text-[12px] whitespace-nowrap text-subtle tabular-nums">
+                {mediumDate(message.date)}
+              </time>
+            </Tip>
           </div>
 
           {body && <Attachments messageId={message.id} attachments={body.attachments ?? []} onToast={onToast} />}
@@ -199,11 +204,10 @@ function ToolButton(props: {
   onClick?: () => void;
 }) {
   const Icon = props.icon;
-  const tip = props.shortcut ? `${props.label} (${props.shortcut})` : props.label;
   return (
+    <Tip label={props.label} shortcut={props.shortcut}>
     <button
       onClick={props.onClick}
-      title={tip}
       aria-label={props.text ? undefined : props.label}
       aria-pressed={props.pressed}
       className={`flex h-8 items-center gap-1.5 rounded-md text-[13px] transition-colors duration-150 hover:bg-hover ${
@@ -213,5 +217,6 @@ function ToolButton(props: {
       <Icon size={16} strokeWidth={1.75} fill={props.pressed ? "currentColor" : "none"} aria-hidden />
       {props.text}
     </button>
+    </Tip>
   );
 }

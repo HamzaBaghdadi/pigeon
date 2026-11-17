@@ -12,10 +12,10 @@ type Props = {
 export default function Welcome({ onAddAccount, onTrySamples }: Props) {
   const [loading, setLoading] = useState(false);
   return (
-    <main className="flex h-screen flex-col items-center justify-center bg-bg px-6 text-center">
+    <main className="flex h-full flex-col items-center justify-center px-6 text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/pigeon.png" alt="" className="h-16 w-16" draggable={false} />
-      <h1 className="mt-5 text-[22px] font-semibold tracking-[-0.02em]">Welcome to Pigeon</h1>
+      <h1 className="display-heading mt-5 font-display text-[22px] font-semibold tracking-[-0.02em]">Welcome to Pigeon</h1>
       <p className="mt-2 max-w-[380px] text-[13.5px] leading-relaxed text-muted">
         All your email accounts in one fast, private inbox. Add your first account to get started.
       </p>
@@ -23,7 +23,7 @@ export default function Welcome({ onAddAccount, onTrySamples }: Props) {
       <div className="mt-7 flex flex-col items-center gap-2.5">
         <button
           onClick={onAddAccount}
-          className="h-9 rounded-md bg-primary px-5 text-[13.5px] font-medium text-white transition-colors duration-150 hover:bg-primary-hover"
+          className="h-9 rounded-md bg-primary px-5 text-[13.5px] font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary-hover"
         >
           Add an account
         </button>

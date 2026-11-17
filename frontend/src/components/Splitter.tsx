@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { Tip } from "./Tip";
 
 type Props = {
   /** Accessible name, e.g. "Resize sidebar". */
@@ -21,6 +22,7 @@ export default function Splitter({ label, value, min, max, defaultValue, onChang
   const clamp = useCallback((w: number) => Math.round(Math.min(max, Math.max(min, w))), [min, max]);
 
   return (
+    <Tip label="Drag to resize · double-click to reset" side="right">
     <div
       role="separator"
       aria-orientation="vertical"
@@ -29,7 +31,6 @@ export default function Splitter({ label, value, min, max, defaultValue, onChang
       aria-valuemin={min}
       aria-valuemax={max}
       tabIndex={0}
-      title={`${label} — double-click to reset`}
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -59,5 +60,6 @@ export default function Splitter({ label, value, min, max, defaultValue, onChang
     >
       <div className="mx-auto h-full w-px bg-border transition-colors duration-150 group-hover:bg-primary group-focus-visible:bg-primary group-active:bg-primary" />
     </div>
+    </Tip>
   );
 }

@@ -22,7 +22,7 @@ export interface Account {
     "demo": boolean;
 
     /**
-     * Auth is how the account signs in: "password" or "google".
+     * Auth is how the account signs in: "password", "google" or "microsoft".
      */
     "auth": string;
 }

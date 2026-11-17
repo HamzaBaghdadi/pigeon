@@ -26,9 +26,25 @@ func (t Theme) Valid() bool {
 	return t == ThemeSystem || t == ThemeLight || t == ThemeDark
 }
 
+// Style is the visual theme, applied on top of the light/dark mode.
+type Style string
+
+const (
+	StyleDefault Style = "default"
+	StyleBlossom Style = "blossom" // soft pastels, drifting petals
+	StyleGilded  Style = "gilded"  // dark fantasy, golden glow and embers
+)
+
+// Valid reports whether s is a known style.
+func (s Style) Valid() bool {
+	return s == StyleDefault || s == StyleBlossom || s == StyleGilded
+}
+
 // Settings are the user's preferences.
 type Settings struct {
 	Theme Theme `json:"theme"`
+	// Style is the visual theme; empty means the default.
+	Style Style `json:"style,omitempty"`
 	// GoogleClientID is the user's own Google OAuth client (see docs/google-sign-in.md).
 	// Its secret is kept in the OS keychain, not here.
 	GoogleClientID string `json:"googleClientId,omitempty"`
@@ -43,6 +59,9 @@ type Settings struct {
 	DisableCloseToTray bool `json:"disableCloseToTray,omitempty"`
 	// TrayHintShown records that the "still running in the tray" tip was shown.
 	TrayHintShown bool `json:"trayHintShown,omitempty"`
+	// AlwaysShowImages loads remote images in every email without asking.
+	// Off by default: remote images tell senders when you open their mail.
+	AlwaysShowImages bool `json:"alwaysShowImages,omitempty"`
 }
 
 func defaults() Settings {
@@ -84,12 +103,16 @@ func OpenAt(path string) (*Store, error) {
 	if loaded.Theme.Valid() {
 		s.cur.Theme = loaded.Theme
 	}
+	if loaded.Style.Valid() && loaded.Style != StyleDefault {
+		s.cur.Style = loaded.Style
+	}
 	s.cur.GoogleClientID = loaded.GoogleClientID
 	s.cur.DisableAutoUpdate = loaded.DisableAutoUpdate
 	s.cur.DisplayName = loaded.DisplayName
 	s.cur.DisableNotifications = loaded.DisableNotifications
 	s.cur.DisableCloseToTray = loaded.DisableCloseToTray
 	s.cur.TrayHintShown = loaded.TrayHintShown
+	s.cur.AlwaysShowImages = loaded.AlwaysShowImages
 	return s, nil
 }
 

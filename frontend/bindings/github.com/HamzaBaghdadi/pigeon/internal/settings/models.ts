@@ -8,6 +8,11 @@ export interface Settings {
     "theme": Theme;
 
     /**
+     * Style is the visual theme; empty means the default.
+     */
+    "style"?: Style;
+
+    /**
      * GoogleClientID is the user's own Google OAuth client (see docs/google-sign-in.md).
      * Its secret is kept in the OS keychain, not here.
      */
@@ -38,7 +43,35 @@ export interface Settings {
      * TrayHintShown records that the "still running in the tray" tip was shown.
      */
     "trayHintShown"?: boolean;
+
+    /**
+     * AlwaysShowImages loads remote images in every email without asking.
+     * Off by default: remote images tell senders when you open their mail.
+     */
+    "alwaysShowImages"?: boolean;
 }
+
+/**
+ * Style is the visual theme, applied on top of the light/dark mode.
+ */
+export enum Style {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    StyleDefault = "default",
+
+    /**
+     * soft pastels, drifting petals
+     */
+    StyleBlossom = "blossom",
+
+    /**
+     * dark fantasy, golden glow and embers
+     */
+    StyleGilded = "gilded",
+};
 
 /**
  * Theme is the user's appearance choice.

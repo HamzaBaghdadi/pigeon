@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { Input } from "@/components/ui/input";
 
 type Props = {
   onSaved: () => void;
@@ -79,7 +80,7 @@ export default function GoogleSetup({ onSaved, onCancel, saveLabel = "Save and c
           <label htmlFor="g-client-id" className="mb-1 block text-[12.5px] font-medium">
             Client ID
           </label>
-          <input
+          <Input
             id="g-client-id"
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
@@ -92,7 +93,7 @@ export default function GoogleSetup({ onSaved, onCancel, saveLabel = "Save and c
           <label htmlFor="g-client-secret" className="mb-1 block text-[12.5px] font-medium">
             Client secret
           </label>
-          <input
+          <Input
             id="g-client-secret"
             type="password"
             value={clientSecret}
@@ -125,7 +126,7 @@ export default function GoogleSetup({ onSaved, onCancel, saveLabel = "Save and c
           type="button"
           onClick={save}
           disabled={busy || !clientId || !clientSecret}
-          className="flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          className="flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50"
         >
           {busy && <Loader2 size={14} className="animate-spin" aria-hidden />}
           {saveLabel}
@@ -135,8 +136,7 @@ export default function GoogleSetup({ onSaved, onCancel, saveLabel = "Save and c
   );
 }
 
-const input =
-  "h-9 w-full rounded-md border border-border bg-surface px-3 font-mono text-[12.5px] text-text outline-none transition-[border-color,box-shadow] duration-150 placeholder:font-sans placeholder:text-subtle hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]";
+const input = "h-9 font-mono text-[12.5px] md:text-[12.5px] placeholder:font-sans";
 
 /** Google's "G" mark, drawn inline (no external request). */
 export function GoogleMark({ size = 16 }: { size?: number }) {

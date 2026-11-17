@@ -65,7 +65,7 @@ export default function MessageBody({ html, allowRemote, onLink }: Props) {
       sandbox="allow-same-origin"
       srcDoc={srcDoc}
       onLoad={onLoad}
-      className="block w-full rounded-lg border border-border bg-white"
+      className="message-card block w-full rounded-lg border border-border bg-white"
       style={{ height: 200 }}
     />
   );

@@ -39,6 +39,13 @@ export function GetSettings(): $CancellablePromise<settings$0.Settings> {
 }
 
 /**
+ * SetAlwaysShowImages chooses whether remote images load automatically.
+ */
+export function SetAlwaysShowImages(on: boolean): $CancellablePromise<settings$0.Settings> {
+    return $Call.ByID(266879709, on);
+}
+
+/**
  * SetCloseToTray chooses whether closing the window keeps Pigeon running in the tray.
  */
 export function SetCloseToTray(on: boolean): $CancellablePromise<settings$0.Settings> {
@@ -57,6 +64,13 @@ export function SetDisplayName(name: string): $CancellablePromise<settings$0.Set
  */
 export function SetNotifications(on: boolean): $CancellablePromise<settings$0.Settings> {
     return $Call.ByID(2708325517, on);
+}
+
+/**
+ * SetStyle saves the visual theme ("default", "blossom" or "gilded").
+ */
+export function SetStyle(style: settings$0.Style): $CancellablePromise<settings$0.Settings> {
+    return $Call.ByID(18714692, style);
 }
 
 /**

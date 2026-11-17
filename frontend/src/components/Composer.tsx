@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Paperclip, Trash2, X } from "lucide-react";
 import { api, errorMessage, type Account, type Address, type AttachmentInfo, type Draft } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tip } from "./Tip";
 
 export type ComposerState = {
   draft: Draft;
@@ -107,26 +111,33 @@ export default function Composer({ state, accounts, onSend, onClose }: Props) {
     >
       <div className="flex h-10 shrink-0 items-center border-b border-border bg-sidebar pr-1.5 pl-4">
         <span className="flex-1 truncate text-[13px] font-medium">{draft.subject.trim() || state.title}</span>
-        <button onClick={close} aria-label="Close" title="Close (Esc)" className="rounded-md p-1.5 text-subtle transition-colors hover:bg-hover hover:text-text">
-          <X size={15} />
-        </button>
+        <Tip label="Close" shortcut="Esc">
+          <button onClick={close} aria-label="Close" className="rounded-md p-1.5 text-subtle transition-colors hover:bg-hover hover:text-text">
+            <X size={15} />
+          </button>
+        </Tip>
       </div>
 
       <div className="shrink-0 divide-y divide-border border-b border-border px-4 text-[13px]">
         {sendable.length > 1 && (
           <Row label="From">
-            <select
-              value={draft.accountId}
-              onChange={(e) => set({ accountId: e.target.value })}
-              className="h-9 w-full bg-transparent text-[13px] text-text outline-none"
-              aria-label="From"
-            >
-              {sendable.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} &lt;{a.email}&gt;
-                </option>
-              ))}
-            </select>
+            <Select value={draft.accountId} onValueChange={(v) => set({ accountId: v })}>
+              <SelectTrigger
+                aria-label="From"
+                className="-ml-2 h-8 w-auto max-w-full border-transparent bg-transparent px-2 text-[13px] shadow-none hover:bg-hover focus-visible:ring-0 dark:bg-transparent"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sendable.map((a) => (
+                  <SelectItem key={a.id} value={a.id} className="text-[13px]">
+                    <span className="h-2 w-2 shrink-0 rounded-[3px]" style={{ background: a.color }} aria-hidden />
+                    <span className="truncate">{a.name}</span>
+                    <span className="truncate text-muted-foreground">{a.email}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Row>
         )}
         <Row label="To">
@@ -153,22 +164,22 @@ export default function Composer({ state, accounts, onSend, onClose }: Props) {
           </Row>
         )}
         <Row label="Subject">
-          <input
+          <Input
             value={draft.subject}
             onChange={(e) => set({ subject: e.target.value })}
             aria-label="Subject"
-            className="h-9 w-full bg-transparent text-[13px] text-text outline-none"
+            className="h-9 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent rounded-none text-[13px] md:text-[13px]"
           />
         </Row>
       </div>
 
-      <textarea
+      <Textarea
         ref={bodyRef}
         value={draft.body}
         onChange={(e) => set({ body: e.target.value })}
         aria-label="Message"
         spellCheck
-        className="selectable min-h-0 flex-1 resize-none bg-transparent px-4 py-3 text-[14px] leading-relaxed text-text outline-none focus-visible:outline-none"
+        className="selectable field-sizing-fixed min-h-0 flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent rounded-none px-4 py-3 text-[14px] leading-relaxed md:text-[14px]"
       />
 
       {draft.attachments.length > 0 && (
@@ -199,21 +210,26 @@ export default function Composer({ state, accounts, onSend, onClose }: Props) {
           </>
         ) : (
           <>
-            <button
-              onClick={send}
-              className="flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-medium text-white transition-colors hover:bg-primary-hover"
-              title="Send (Ctrl+Enter)"
-            >
-              Send
-              <span className="text-[11px] font-normal text-white/60">Ctrl ↵</span>
-            </button>
-            <button onClick={attach} aria-label="Attach files" title="Attach files" className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-text">
-              <Paperclip size={16} strokeWidth={1.75} />
-            </button>
+            <Tip label="Send" shortcut="Ctrl ↵" side="top">
+              <button
+                onClick={send}
+                className="flex h-8 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+              >
+                Send
+                <span className="text-[11px] font-normal text-primary-foreground/60">Ctrl ↵</span>
+              </button>
+            </Tip>
+            <Tip label="Attach files" side="top">
+              <button onClick={attach} aria-label="Attach files" className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-text">
+                <Paperclip size={16} strokeWidth={1.75} />
+              </button>
+            </Tip>
             <div className="flex-1" />
-            <button onClick={close} aria-label="Discard draft" title="Discard" className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-danger">
-              <Trash2 size={16} strokeWidth={1.75} />
-            </button>
+            <Tip label="Discard draft" side="top">
+              <button onClick={close} aria-label="Discard draft" className="rounded-md p-2 text-muted transition-colors hover:bg-hover hover:text-danger">
+                <Trash2 size={16} strokeWidth={1.75} />
+              </button>
+            </Tip>
           </>
         )}
       </div>
@@ -328,9 +344,8 @@ function RecipientInput(props: {
   return (
     <div className="relative flex min-w-0 flex-1 flex-wrap items-center gap-1 py-1.5">
       {props.value.map((a) => (
+        <Tip key={a.email} label={a.email} side="top">
         <span
-          key={a.email}
-          title={a.email}
           className="flex max-w-[220px] items-center gap-1 rounded-md bg-active py-0.5 pr-0.5 pl-2 text-[12.5px]"
         >
           <span className="truncate">{a.name || a.email}</span>
@@ -342,8 +357,9 @@ function RecipientInput(props: {
             <X size={11} />
           </button>
         </span>
+        </Tip>
       ))}
-      <input
+      <Input
         ref={ref}
         value={text}
         aria-label={props.label}
@@ -377,7 +393,7 @@ function RecipientInput(props: {
           }
         }}
         onBlur={() => setTimeout(() => text.trim() && commit(text), 120)}
-        className={`h-7 min-w-[120px] flex-1 bg-transparent text-[13px] outline-none ${invalid ? "text-danger" : "text-text"}`}
+        className={`h-7 w-auto min-w-[120px] flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent rounded-none text-[13px] md:text-[13px] ${invalid ? "text-danger" : "text-text"}`}
       />
       {shown.length > 0 && (
         <ul role="listbox" className="absolute top-full left-0 z-10 mt-1 w-[min(360px,100%)] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">

@@ -13,7 +13,13 @@ import {
   type UpdateStatus,
   type Draft,
 } from "@/lib/api";
-import { applyTheme, type ThemeChoice } from "@/lib/theme";
+import {
+  applyStyle,
+  applyTheme,
+  toStyle,
+  type StyleChoice,
+  type ThemeChoice,
+} from "@/lib/theme";
 import Sidebar from "./Sidebar";
 import MessageList from "./MessageList";
 import Reader from "./Reader";
@@ -47,7 +53,12 @@ function usePaneWidth(key: string, fallback: number) {
   return [width, setWidth] as const;
 }
 
-type Toast = { text: string; tone?: "error"; undo?: () => void; undoLabel?: string };
+type Toast = {
+  text: string;
+  tone?: "error";
+  undo?: () => void;
+  undoLabel?: string;
+};
 
 const UNDO_SEND_MS = 5000;
 
@@ -57,8 +68,16 @@ export default function Mailbox() {
   const [accountId, setAccountId] = useState(""); // "" = all inboxes
   const [role, setRole] = useState<FolderRole>("inbox" as FolderRole);
   const [folderId, setFolderId] = useState(""); // a specific folder, or "" for a role view
-  const [history, setHistory] = useState<{ key: string; loading: boolean; done: boolean }>({ key: "", loading: false, done: false });
-  const [serverSearch, setServerSearch] = useState<{ key: string; busy: boolean; matched: number | null }>({ key: "", busy: false, matched: null });
+  const [history, setHistory] = useState<{
+    key: string;
+    loading: boolean;
+    done: boolean;
+  }>({ key: "", loading: false, done: false });
+  const [serverSearch, setServerSearch] = useState<{
+    key: string;
+    busy: boolean;
+    matched: number | null;
+  }>({ key: "", busy: false, matched: null });
   const [moving, setMoving] = useState<MessageSummary | null>(null);
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<MessageSummary[]>([]);
@@ -68,16 +87,24 @@ export default function Mailbox() {
   const [sync, setSync] = useState<SyncStatus | null>(null);
   const [update, setUpdate] = useState<UpdateStatus | null>(null);
   const [theme, setTheme] = useState<ThemeChoice>("system");
+  const [style, setStyle] = useState<StyleChoice>("default");
+  const [alwaysShowImages, setAlwaysShowImages] = useState(false);
   const [settingsSection, setSettingsSection] = useState<Section | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [composer, setComposer] = useState<ComposerState | null>(null);
   const pendingOpen = useRef<string | null>(null);
   const sendTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sidebarW, setSidebarW] = usePaneWidth("pigeon.pane.sidebar", SIDEBAR.default);
+  const [sidebarW, setSidebarW] = usePaneWidth(
+    "pigeon.pane.sidebar",
+    SIDEBAR.default,
+  );
   const [listW, setListW] = usePaneWidth("pigeon.pane.list", LIST.default);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const fail = useCallback((err: unknown) => setToast({ text: errorMessage(err), tone: "error" }), []);
+  const fail = useCallback(
+    (err: unknown) => setToast({ text: errorMessage(err), tone: "error" }),
+    [],
+  );
 
   const refreshAccounts = useCallback(() => {
     api.listAccounts().then(setAccounts, fail);
@@ -91,6 +118,10 @@ export default function Mailbox() {
       const t = (s.theme || "system") as ThemeChoice;
       setTheme(t);
       applyTheme(t);
+      const st = toStyle(s.style);
+      setStyle(st);
+      applyStyle(st);
+      setAlwaysShowImages(Boolean(s.alwaysShowImages));
     });
     api.getSyncStatus().then(setSync);
     api.getUpdateStatus().then(setUpdate);
@@ -122,19 +153,33 @@ export default function Mailbox() {
   }, [refreshAccounts]);
 
   // If the chosen account was removed, show all inboxes.
-  const activeAccount = accountId && accounts?.some((a) => a.id === accountId) ? accountId : "";
-  const activeFolder = folderId && folders.some((f) => f.id === folderId) ? folders.find((f) => f.id === folderId) : undefined;
+  const activeAccount =
+    accountId && accounts?.some((a) => a.id === accountId) ? accountId : "";
+  const activeFolder =
+    folderId && folders.some((f) => f.id === folderId)
+      ? folders.find((f) => f.id === folderId)
+      : undefined;
   const viewKey = activeFolder ? activeFolder.id : `${activeAccount}:${role}`;
-  const historyState = history.key === viewKey ? history : { key: viewKey, loading: false, done: false };
+  const historyState =
+    history.key === viewKey
+      ? history
+      : { key: viewKey, loading: false, done: false };
   const searchKey = `${viewKey}|${query.trim()}`;
-  const searchState = serverSearch.key === searchKey ? serverSearch : { key: searchKey, busy: false, matched: null };
+  const searchState =
+    serverSearch.key === searchKey
+      ? serverSearch
+      : { key: searchKey, busy: false, matched: null };
 
   useEffect(() => {
     let cancelled = false;
-    const load = activeFolder ? api.listFolderMessages(activeFolder.id, query) : api.listMessages(activeAccount, role, query);
+    const load = activeFolder
+      ? api.listFolderMessages(activeFolder.id, query)
+      : api.listMessages(activeAccount, role, query);
     load.then((list) => {
       if (cancelled) return;
-      const open = pendingOpen.current ? list.find((m) => m.id === pendingOpen.current) : undefined;
+      const open = pendingOpen.current
+        ? list.find((m) => m.id === pendingOpen.current)
+        : undefined;
       if (open) {
         // Opened from a notification: select it and mark it read.
         pendingOpen.current = null;
@@ -147,7 +192,9 @@ export default function Mailbox() {
         return;
       }
       setMessages(list);
-      setSelectedId((cur) => (cur && list.some((m) => m.id === cur) ? cur : null));
+      setSelectedId((cur) =>
+        cur && list.some((m) => m.id === cur) ? cur : null,
+      );
     }, fail);
     return () => {
       cancelled = true;
@@ -173,20 +220,37 @@ export default function Mailbox() {
     const key = viewKey;
     setHistory({ key, loading: true, done: false });
     try {
-      const res = await api.loadOlder(activeAccount, role, activeFolder?.id ?? "");
+      const res = await api.loadOlder(
+        activeAccount,
+        role,
+        activeFolder?.id ?? "",
+      );
       setHistory({ key, loading: false, done: res.done });
       if (res.added > 0) setReload((n) => n + 1);
     } catch (err) {
       setHistory({ key, loading: false, done: false });
       fail(err);
     }
-  }, [historyState.loading, historyState.done, viewKey, activeAccount, role, activeFolder, fail]);
+  }, [
+    historyState.loading,
+    historyState.done,
+    viewKey,
+    activeAccount,
+    role,
+    activeFolder,
+    fail,
+  ]);
 
   const searchOnServer = useCallback(async () => {
     const key = searchKey;
     setServerSearch({ key, busy: true, matched: null });
     try {
-      const res = await api.searchServer(activeAccount, role, activeFolder?.id ?? "", query);
+      const res = await api.searchServer(
+        activeAccount,
+        role,
+        activeFolder?.id ?? "",
+        query,
+      );
       setServerSearch({ key, busy: false, matched: res.matched });
       if (res.added > 0) setReload((n) => n + 1);
     } catch (err) {
@@ -197,11 +261,17 @@ export default function Mailbox() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), toast.tone === "error" ? 8000 : 5000);
+    const t = setTimeout(
+      () => setToast(null),
+      toast.tone === "error" ? 8000 : 5000,
+    );
     return () => clearTimeout(t);
   }, [toast]);
 
-  const accountsById = useMemo(() => new Map((accounts ?? []).map((a) => [a.id, a])), [accounts]);
+  const accountsById = useMemo(
+    () => new Map((accounts ?? []).map((a) => [a.id, a])),
+    [accounts],
+  );
   const selected = messages.find((m) => m.id === selectedId) ?? null;
 
   const changeTheme = useCallback((t: ThemeChoice) => {
@@ -210,8 +280,16 @@ export default function Mailbox() {
     api.setTheme(t);
   }, []);
 
+  const changeStyle = useCallback((st: StyleChoice) => {
+    setStyle(st);
+    applyStyle(st);
+    api.setStyle(st);
+  }, []);
+
   const patch = useCallback((id: string, change: Partial<MessageSummary>) => {
-    setMessages((list) => list.map((m) => (m.id === id ? { ...m, ...change } : m)));
+    setMessages((list) =>
+      list.map((m) => (m.id === id ? { ...m, ...change } : m)),
+    );
   }, []);
 
   const select = useCallback(
@@ -283,7 +361,10 @@ export default function Mailbox() {
     },
     [messages, refreshAccounts, fail],
   );
-  const archive = useCallback((m: MessageSummary) => move(m, "archive" as FolderRole, "Archived"), [move]);
+  const archive = useCallback(
+    (m: MessageSummary) => move(m, "archive" as FolderRole, "Archived"),
+    [move],
+  );
   const moveToFolder = useCallback(
     async (m: MessageSummary, target: Folder) => {
       setMoving(null);
@@ -317,7 +398,10 @@ export default function Mailbox() {
     },
     [messages, refreshAccounts, fail],
   );
-  const trash = useCallback((m: MessageSummary) => move(m, "trash" as FolderRole, "Moved to Trash"), [move]);
+  const trash = useCallback(
+    (m: MessageSummary) => move(m, "trash" as FolderRole, "Moved to Trash"),
+    [move],
+  );
 
   const compose = useCallback(() => {
     const list = accounts ?? [];
@@ -327,7 +411,16 @@ export default function Mailbox() {
     if (!from) return;
     setComposer({
       title: "New message",
-      draft: { accountId: from.id, to: [], cc: [], bcc: [], subject: "", body: "", replyToId: "", attachments: [] },
+      draft: {
+        accountId: from.id,
+        to: [],
+        cc: [],
+        bcc: [],
+        subject: "",
+        body: "",
+        replyToId: "",
+        attachments: [],
+      },
     });
   }, [accounts, activeAccount]);
 
@@ -335,7 +428,15 @@ export default function Mailbox() {
     async (m: MessageSummary, mode: "reply" | "replyAll" | "forward") => {
       try {
         const draft = await api.newDraft(m.id, mode);
-        setComposer({ draft, title: mode === "forward" ? "Forward" : mode === "replyAll" ? "Reply all" : "Reply" });
+        setComposer({
+          draft,
+          title:
+            mode === "forward"
+              ? "Forward"
+              : mode === "replyAll"
+                ? "Reply all"
+                : "Reply",
+        });
       } catch (err) {
         fail(err);
       }
@@ -344,35 +445,35 @@ export default function Mailbox() {
   );
 
   /** Undo send: the message waits a few seconds before it really goes out. */
-  const queueSend = useCallback(
-    (draft: Draft, title: string) => {
-      setComposer(null);
-      if (sendTimer.current) clearTimeout(sendTimer.current);
-      sendTimer.current = setTimeout(async () => {
+  const queueSend = useCallback((draft: Draft, title: string) => {
+    setComposer(null);
+    if (sendTimer.current) clearTimeout(sendTimer.current);
+    sendTimer.current = setTimeout(async () => {
+      sendTimer.current = null;
+      setToast({ text: "Sending…" });
+      try {
+        await api.send(draft);
+        setToast({ text: "Message sent" });
+        setReload((n) => n + 1);
+      } catch (err) {
+        setToast({
+          text: `Couldn't send: ${errorMessage(err)}`,
+          tone: "error",
+        });
+        setComposer({ draft, title }); // give the draft back
+      }
+    }, UNDO_SEND_MS);
+    setToast({
+      text: "Sending…",
+      undoLabel: "Undo",
+      undo: () => {
+        if (sendTimer.current) clearTimeout(sendTimer.current);
         sendTimer.current = null;
-        setToast({ text: "Sending…" });
-        try {
-          await api.send(draft);
-          setToast({ text: "Message sent" });
-          setReload((n) => n + 1);
-        } catch (err) {
-          setToast({ text: `Couldn't send: ${errorMessage(err)}`, tone: "error" });
-          setComposer({ draft, title }); // give the draft back
-        }
-      }, UNDO_SEND_MS);
-      setToast({
-        text: "Sending…",
-        undoLabel: "Undo",
-        undo: () => {
-          if (sendTimer.current) clearTimeout(sendTimer.current);
-          sendTimer.current = null;
-          setToast(null);
-          setComposer({ draft, title });
-        },
-      });
-    },
-    [],
-  );
+        setToast(null);
+        setComposer({ draft, title });
+      },
+    });
+  }, []);
 
   const dialogOpen = settingsSection !== null || addOpen || moving !== null;
 
@@ -416,9 +517,15 @@ export default function Mailbox() {
         compose();
       } else if (!selected) {
         return;
-      } else if ((e.key === "r" || e.key === "a" || e.key === "f") && !composer) {
+      } else if (
+        (e.key === "r" || e.key === "a" || e.key === "f") &&
+        !composer
+      ) {
         e.preventDefault();
-        respond(selected, e.key === "r" ? "reply" : e.key === "a" ? "replyAll" : "forward");
+        respond(
+          selected,
+          e.key === "r" ? "reply" : e.key === "a" ? "replyAll" : "forward",
+        );
       } else if (e.key === "s") {
         toggleStar(selected);
       } else if (e.key === "u") {
@@ -436,7 +543,21 @@ export default function Mailbox() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dialogOpen, messages, selectedId, selected, toast, select, toggleStar, toggleRead, archive, trash, composer, compose, respond]);
+  }, [
+    dialogOpen,
+    messages,
+    selectedId,
+    selected,
+    toast,
+    select,
+    toggleStar,
+    toggleRead,
+    archive,
+    trash,
+    composer,
+    compose,
+    respond,
+  ]);
 
   const dialogs = (
     <>
@@ -445,7 +566,14 @@ export default function Mailbox() {
           initialSection={settingsSection}
           theme={theme}
           onThemeChange={changeTheme}
-          onClose={() => setSettingsSection(null)}
+          themeStyle={style}
+          onStyleChange={changeStyle}
+          onClose={() => {
+            setSettingsSection(null);
+            api
+              .getSettings()
+              .then((s) => setAlwaysShowImages(Boolean(s.alwaysShowImages)));
+          }}
           accounts={accounts ?? []}
           hasSamples={(accounts ?? []).some((a) => a.demo)}
           syncErrors={sync?.errors ?? {}}
@@ -515,14 +643,20 @@ export default function Mailbox() {
           role={toast.tone === "error" ? "alert" : "status"}
           className="absolute bottom-5 left-1/2 z-[60] flex max-w-[min(560px,90vw)] items-center gap-4 rounded-lg bg-toast py-1.5 pr-1.5 pl-4 text-[13px] text-toast-fg shadow-lg [animation:toast-in_160ms_ease-out]"
         >
-          {toast.tone === "error" && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-danger" aria-hidden />}
+          {toast.tone === "error" && (
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-danger"
+              aria-hidden
+            />
+          )}
           <span className="py-1">{toast.text}</span>
           {toast.undo ? (
             <button
               onClick={toast.undo}
               className="shrink-0 rounded-md px-2.5 py-1 font-medium text-toast-action transition-colors duration-150 hover:bg-white/10"
             >
-              {toast.undoLabel ?? "Undo"} {!toast.undoLabel && <span className="ml-1 opacity-60">Z</span>}
+              {toast.undoLabel ?? "Undo"}{" "}
+              {!toast.undoLabel && <span className="ml-1 opacity-60">Z</span>}
             </button>
           ) : (
             <button
@@ -538,11 +672,11 @@ export default function Mailbox() {
     </>
   );
 
-  if (accounts === null) return <div className="h-screen bg-bg" />;
+  if (accounts === null) return <div className="h-full" />;
 
   if (accounts.length === 0) {
     return (
-      <div className="relative">
+      <div className="relative h-full">
         <Welcome
           onAddAccount={() => setAddOpen(true)}
           onTrySamples={async () => {
@@ -561,8 +695,11 @@ export default function Mailbox() {
   }
 
   return (
-    <div className="relative flex h-screen bg-bg text-text">
-      <div style={{ width: sidebarW }} className="flex min-w-[168px] shrink-[1]">
+    <div className="relative flex h-full text-text">
+      <div
+        style={{ width: sidebarW }}
+        className="flex min-w-[168px] shrink-[1]"
+      >
         <Sidebar
           accounts={accounts}
           folders={folders}
@@ -594,13 +731,22 @@ export default function Mailbox() {
             setRole(r);
             setSelectedId(null);
           }}
-          onOpenSettings={(section) => setSettingsSection(section ?? "appearance")}
+          onOpenSettings={(section) =>
+            setSettingsSection(section ?? "appearance")
+          }
           onAddAccount={() => setAddOpen(true)}
           onSyncNow={() => api.syncNow()}
           onCompose={compose}
         />
       </div>
-      <Splitter label="Resize sidebar" value={sidebarW} min={SIDEBAR.min} max={SIDEBAR.max} defaultValue={SIDEBAR.default} onChange={setSidebarW} />
+      <Splitter
+        label="Resize sidebar"
+        value={sidebarW}
+        min={SIDEBAR.min}
+        max={SIDEBAR.max}
+        defaultValue={SIDEBAR.default}
+        onChange={setSidebarW}
+      />
       <div style={{ width: listW }} className="flex min-w-[260px] shrink-[2]">
         <MessageList
           messages={messages}
@@ -626,7 +772,14 @@ export default function Mailbox() {
           onTrash={trash}
         />
       </div>
-      <Splitter label="Resize message list" value={listW} min={LIST.min} max={LIST.max} defaultValue={LIST.default} onChange={setListW} />
+      <Splitter
+        label="Resize message list"
+        value={listW}
+        min={LIST.min}
+        max={LIST.max}
+        defaultValue={LIST.default}
+        onChange={setListW}
+      />
       <Reader
         message={selected}
         account={selected ? accountsById.get(selected.accountId) : undefined}
@@ -636,8 +789,14 @@ export default function Mailbox() {
         onTrash={trash}
         onRespond={respond}
         onMove={(m) => setMoving(m)}
+        alwaysShowImages={alwaysShowImages}
         onToast={(text, action, error) =>
-          setToast({ text, tone: error ? "error" : undefined, undo: action?.run, undoLabel: action?.label })
+          setToast({
+            text,
+            tone: error ? "error" : undefined,
+            undo: action?.run,
+            undoLabel: action?.label,
+          })
         }
       />
       {dialogs}

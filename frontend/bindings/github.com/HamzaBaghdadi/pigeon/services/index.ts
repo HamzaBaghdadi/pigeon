@@ -27,6 +27,7 @@ export type {
     Draft,
     GoogleSetup,
     HistoryResult,
+    MicrosoftSetup,
     MoveResult,
     SyncStatus,
     UpdateStatus

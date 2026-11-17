@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download, ExternalLink, File, FileArchive, FileImage, FileSpreadsheet, FileText, Loader2, ShieldAlert } from "lucide-react";
+import { Tip } from "./Tip";
 import { api, errorMessage, type Attachment } from "@/lib/api";
 
 // Mirrors the Go list; the backend enforces it, this only adjusts the UI.
@@ -75,9 +76,9 @@ export default function Attachments({ messageId, attachments, onToast }: Props) 
                 <Icon size={18} strokeWidth={1.75} className="shrink-0 text-muted" aria-hidden />
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12.5px] font-medium" title={name}>
-                  {name}
-                </div>
+                <Tip label={name} side="top">
+                  <div className="truncate text-[12.5px] font-medium">{name}</div>
+                </Tip>
                 <div className="text-[11.5px] text-subtle">{risky ? "Can run code · save to scan" : formatSize(a.size)}</div>
               </div>
               <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -100,14 +101,15 @@ export default function Attachments({ messageId, attachments, onToast }: Props) 
 
 function IconButton(props: { label: string; busy: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
+    <Tip label={props.label} side="top">
     <button
       onClick={props.onClick}
       disabled={props.busy}
-      title={props.label}
       aria-label={props.label}
       className="rounded-md p-1.5 text-muted transition-colors hover:bg-hover hover:text-text disabled:opacity-60"
     >
       {props.busy ? <Loader2 size={14} className="animate-spin" /> : props.children}
     </button>
+    </Tip>
   );
 }

@@ -1,4 +1,17 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* dark: follows Pigeon's theme choice: forced Dark, or System while Windows is dark. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
 
 /*
  * Pigeon design tokens.
@@ -27,6 +40,15 @@
   --toast-bg: #1d1e24;
   --toast-fg: #f2f2f5;
   --toast-action: #9fb3ff;
+  --primary-fg: #ffffff;
+  /* The three main panes. Solid by default; themes make them translucent so
+     their ambient background shows through. Dialogs keep --surface (solid). */
+  --pane-side: var(--sidebar);
+  --pane-list: var(--surface);
+  --pane-main: var(--surface);
+  --app-bg: var(--bg);
+  --body-font: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --display-font: var(--body-font);
   color-scheme: light;
 }
 
@@ -73,6 +95,291 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Themes (data-style on <html>). Each has a light and a dark palette; dark
+ * follows the same rules as above (forced Dark, or System while Windows is
+ * dark). Every token set in a light block is also set in its dark block.
+ * ------------------------------------------------------------------------- */
+
+/* Blossom: soft pastels, rounded type, drifting petals. */
+:root[data-style="blossom"] {
+  --app-bg:
+    radial-gradient(60% 50% at 12% 8%, rgba(255, 182, 213, 0.5), transparent 70%),
+    radial-gradient(50% 45% at 92% 18%, rgba(214, 190, 255, 0.45), transparent 70%),
+    radial-gradient(60% 50% at 60% 102%, rgba(255, 210, 186, 0.45), transparent 70%), #fdf2f7;
+  --bg: rgba(255, 255, 255, 0.62);
+  --sidebar: #fbe6ef;
+  --surface: #fffbfd;
+  --pane-side: rgba(252, 229, 240, 0.66);
+  --pane-list: rgba(255, 251, 253, 0.72);
+  --pane-main: rgba(255, 249, 252, 0.58);
+  --hover: rgba(200, 53, 127, 0.06);
+  --active: rgba(200, 53, 127, 0.1);
+  --border: rgba(200, 53, 127, 0.14);
+  --border-strong: rgba(200, 53, 127, 0.24);
+  --text: #3a2232;
+  --text-muted: #74506a;
+  --text-subtle: #9a7590;
+  --primary: #c8357f;
+  --primary-hover: #b02c6e;
+  --primary-soft: rgba(200, 53, 127, 0.1);
+  --primary-fg: #ffffff;
+  --selected: rgba(200, 53, 127, 0.08);
+  --star: #f2a516;
+  --ring: rgba(200, 53, 127, 0.4);
+  --toast-bg: #3a2232;
+  --toast-fg: #fff3f9;
+  --toast-action: #ffb3d6;
+  --glow: rgba(200, 53, 127, 0.45);
+  --primary-grad: linear-gradient(180deg, #e2569c, #c2347b);
+  --body-font: "Nunito Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --display-font: var(--body-font);
+  color-scheme: light;
+}
+:root[data-style="blossom"][data-theme="dark"] {
+  --app-bg:
+    radial-gradient(60% 50% at 12% 4%, rgba(255, 120, 180, 0.2), transparent 70%),
+    radial-gradient(50% 45% at 92% 14%, rgba(160, 120, 255, 0.18), transparent 70%),
+    radial-gradient(60% 50% at 60% 106%, rgba(255, 150, 120, 0.12), transparent 70%), #160d19;
+  --bg: rgba(44, 26, 50, 0.55);
+  --sidebar: #170e1b;
+  --surface: #22162b;
+  --pane-side: rgba(22, 13, 26, 0.7);
+  --pane-list: rgba(34, 21, 42, 0.68);
+  --pane-main: rgba(28, 17, 34, 0.56);
+  --hover: rgba(255, 140, 192, 0.07);
+  --active: rgba(255, 140, 192, 0.12);
+  --border: rgba(255, 160, 205, 0.13);
+  --border-strong: rgba(255, 160, 205, 0.22);
+  --text: #f7e9f1;
+  --text-muted: #d0b3c6;
+  --text-subtle: #9c8195;
+  --primary: #ff8cc0;
+  --primary-hover: #ffa6cf;
+  --primary-soft: rgba(255, 140, 192, 0.15);
+  --primary-fg: #2a0f1f;
+  --selected: rgba(255, 140, 192, 0.11);
+  --star: #ffc94d;
+  --ring: rgba(255, 140, 192, 0.5);
+  --toast-bg: #2e1e35;
+  --toast-fg: #fbeef5;
+  --toast-action: #ffaed3;
+  --glow: rgba(255, 140, 192, 0.5);
+  --primary-grad: linear-gradient(180deg, #ffa3cc, #ff7ab5);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="blossom"]:not([data-theme="light"]) {
+    --app-bg:
+      radial-gradient(60% 50% at 12% 4%, rgba(255, 120, 180, 0.2), transparent 70%),
+      radial-gradient(50% 45% at 92% 14%, rgba(160, 120, 255, 0.18), transparent 70%),
+      radial-gradient(60% 50% at 60% 106%, rgba(255, 150, 120, 0.12), transparent 70%), #160d19;
+    --bg: rgba(44, 26, 50, 0.55);
+    --sidebar: #170e1b;
+    --surface: #22162b;
+    --pane-side: rgba(22, 13, 26, 0.7);
+    --pane-list: rgba(34, 21, 42, 0.68);
+    --pane-main: rgba(28, 17, 34, 0.56);
+    --hover: rgba(255, 140, 192, 0.07);
+    --active: rgba(255, 140, 192, 0.12);
+    --border: rgba(255, 160, 205, 0.13);
+    --border-strong: rgba(255, 160, 205, 0.22);
+    --text: #f7e9f1;
+    --text-muted: #d0b3c6;
+    --text-subtle: #9c8195;
+    --primary: #ff8cc0;
+    --primary-hover: #ffa6cf;
+    --primary-soft: rgba(255, 140, 192, 0.15);
+    --primary-fg: #2a0f1f;
+    --selected: rgba(255, 140, 192, 0.11);
+    --star: #ffc94d;
+    --ring: rgba(255, 140, 192, 0.5);
+    --toast-bg: #2e1e35;
+    --toast-fg: #fbeef5;
+    --toast-action: #ffaed3;
+    --glow: rgba(255, 140, 192, 0.5);
+    --primary-grad: linear-gradient(180deg, #ffa3cc, #ff7ab5);
+    color-scheme: dark;
+  }
+}
+
+/* Gilded: dark fantasy. Ash-black stone, a golden glow from above, rising
+   embers, engraved serif titles. The light version is aged parchment. */
+:root[data-style="gilded"] {
+  --app-bg:
+    radial-gradient(120% 70% at 50% -18%, rgba(201, 154, 69, 0.24), transparent 60%),
+    radial-gradient(60% 50% at 100% 100%, rgba(160, 110, 40, 0.14), transparent 70%), #f3ecdc;
+  --bg: rgba(255, 251, 242, 0.66);
+  --sidebar: #ebe2cc;
+  --surface: #fcf8ef;
+  --pane-side: rgba(233, 222, 197, 0.7);
+  --pane-list: rgba(252, 248, 239, 0.82);
+  --pane-main: rgba(250, 245, 233, 0.72);
+  --hover: rgba(120, 90, 30, 0.06);
+  --active: rgba(120, 90, 30, 0.1);
+  --border: rgba(120, 90, 30, 0.16);
+  --border-strong: rgba(120, 90, 30, 0.26);
+  --text: #2b2216;
+  --text-muted: #5f5139;
+  --text-subtle: #857657;
+  --primary: #8a6a1f;
+  --primary-hover: #75591a;
+  --primary-soft: rgba(138, 106, 31, 0.12);
+  --primary-fg: #fffaf0;
+  --selected: rgba(138, 106, 31, 0.09);
+  --star: #c98a12;
+  --ring: rgba(138, 106, 31, 0.45);
+  --toast-bg: #2b2216;
+  --toast-fg: #f6eedb;
+  --toast-action: #e9c97c;
+  --glow: rgba(170, 120, 30, 0.4);
+  --primary-grad: linear-gradient(180deg, #a8842f, #7f601b);
+  --gold-text: linear-gradient(180deg, #6b4f12, #9a7424);
+  --display-font: "Cinzel Variable", "Iowan Old Style", Georgia, serif;
+  color-scheme: light;
+}
+:root[data-style="gilded"][data-theme="dark"] {
+  --app-bg:
+    radial-gradient(120% 75% at 58% -20%, rgba(224, 178, 88, 0.3), transparent 62%),
+    radial-gradient(60% 50% at 100% 100%, rgba(150, 96, 34, 0.16), transparent 70%),
+    radial-gradient(50% 40% at 0% 85%, rgba(110, 80, 40, 0.12), transparent 70%),
+    radial-gradient(140% 120% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%), #0b0906;
+  --bg: rgba(24, 19, 12, 0.62);
+  --sidebar: #0c0a07;
+  --surface: #15110b;
+  --pane-side: rgba(10, 8, 5, 0.62);
+  --pane-list: rgba(19, 15, 10, 0.68);
+  --pane-main: rgba(15, 12, 8, 0.6);
+  --text-halo: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.6);
+  --hover: rgba(226, 189, 106, 0.06);
+  --active: rgba(226, 189, 106, 0.11);
+  --border: rgba(226, 189, 106, 0.14);
+  --border-strong: rgba(226, 189, 106, 0.24);
+  --text: #efe6d2;
+  --text-muted: #bfb294;
+  --text-subtle: #8c8064;
+  --primary: #e2bd6a;
+  --primary-hover: #f0cf82;
+  --primary-soft: rgba(226, 189, 106, 0.14);
+  --primary-fg: #1c1408;
+  --selected: rgba(226, 189, 106, 0.1);
+  --star: #f0c34e;
+  --ring: rgba(226, 189, 106, 0.5);
+  --toast-bg: #1d170e;
+  --toast-fg: #f3ead6;
+  --toast-action: #e9c97c;
+  --glow: rgba(232, 180, 90, 0.55);
+  --primary-grad: linear-gradient(180deg, #f3d58f, #c99a45);
+  --gold-text: linear-gradient(180deg, #fbeecb, #d6ad5c);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-style="gilded"]:not([data-theme="light"]) {
+    --app-bg:
+      radial-gradient(120% 75% at 58% -20%, rgba(224, 178, 88, 0.3), transparent 62%),
+      radial-gradient(60% 50% at 100% 100%, rgba(150, 96, 34, 0.16), transparent 70%),
+      radial-gradient(50% 40% at 0% 85%, rgba(110, 80, 40, 0.12), transparent 70%),
+    radial-gradient(140% 120% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.55) 100%), #0b0906;
+    --bg: rgba(24, 19, 12, 0.62);
+    --sidebar: #0c0a07;
+    --surface: #15110b;
+    --pane-side: rgba(10, 8, 5, 0.62);
+    --pane-list: rgba(19, 15, 10, 0.68);
+    --pane-main: rgba(15, 12, 8, 0.6);
+  --text-halo: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.6);
+    --hover: rgba(226, 189, 106, 0.06);
+    --active: rgba(226, 189, 106, 0.11);
+    --border: rgba(226, 189, 106, 0.14);
+    --border-strong: rgba(226, 189, 106, 0.24);
+    --text: #efe6d2;
+    --text-muted: #bfb294;
+    --text-subtle: #8c8064;
+    --primary: #e2bd6a;
+    --primary-hover: #f0cf82;
+    --primary-soft: rgba(226, 189, 106, 0.14);
+    --primary-fg: #1c1408;
+    --selected: rgba(226, 189, 106, 0.1);
+    --star: #f0c34e;
+    --ring: rgba(226, 189, 106, 0.5);
+    --toast-bg: #1d170e;
+    --toast-fg: #f3ead6;
+    --toast-action: #e9c97c;
+    --glow: rgba(232, 180, 90, 0.55);
+    --primary-grad: linear-gradient(180deg, #f3d58f, #c99a45);
+    --gold-text: linear-gradient(180deg, #fbeecb, #d6ad5c);
+    color-scheme: dark;
+  }
+}
+
+/* Theme details. Unlayered, so they win over Tailwind utilities on purpose. */
+:root[data-style] .bg-primary {
+  background-image: var(--primary-grad);
+  box-shadow: 0 0 16px -3px var(--glow);
+}
+:root[data-style] .bg-primary:hover {
+  filter: brightness(1.06);
+}
+:root[data-style] ::selection {
+  background: var(--primary-soft);
+}
+:root[data-style] * {
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+:root[data-style="blossom"] .display-heading {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+:root[data-style="gilded"] .display-heading {
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+:root[data-style="gilded"] .brand-word {
+  letter-spacing: 0.24em;
+  background: var(--gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* The open message sits in a faint golden halo; the selected row is lit
+   from its left edge. */
+/* Text over the tree gets a soft dark halo (dark mode only). */
+:root[data-style="gilded"] .bg-pane-main,
+:root[data-style="gilded"] .bg-pane-list {
+  text-shadow: var(--text-halo, none);
+}
+/* Gradient text is transparent, so a text-shadow would show through it. */
+:root[data-style="gilded"] .bg-pane-main .display-heading,
+:root[data-style="gilded"] .bg-pane-list .display-heading {
+  text-shadow: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}
+:root[data-style="gilded"] .message-card {
+  border-color: var(--border-strong);
+  box-shadow:
+    0 0 0 1px var(--primary-soft),
+    0 0 48px -12px var(--glow);
+}
+:root[data-style="gilded"] [aria-selected="true"] {
+  box-shadow: inset 40px 0 40px -36px var(--glow);
+}
+:root[data-style="blossom"] .message-card {
+  box-shadow: 0 10px 30px -18px var(--glow);
+}
+/* A thin line of light under the title bar, brightest in the middle. */
+:root[data-style="gilded"] .titlebar {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(90deg, transparent, var(--border-strong) 20%, var(--primary) 50%, var(--border-strong) 80%, transparent);
+  background-size: 100% 1px;
+  background-position: bottom;
+  background-repeat: no-repeat;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-sidebar: var(--sidebar);
@@ -93,7 +400,26 @@
   --color-toast: var(--toast-bg);
   --color-toast-fg: var(--toast-fg);
   --color-toast-action: var(--toast-action);
-  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* shadcn/ui names, mapped onto Pigeon's palette */
+  --color-background: var(--surface);
+  --color-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-accent: var(--active);
+  --color-accent-foreground: var(--text);
+  --color-secondary: var(--active);
+  --color-secondary-foreground: var(--text);
+  --color-muted-foreground: var(--text-subtle);
+  --color-primary-foreground: var(--primary-fg);
+  --color-destructive: var(--danger);
+  --color-input: var(--border-strong);
+  --color-ring: var(--primary);
+  --color-pane-side: var(--pane-side);
+  --color-pane-list: var(--pane-list);
+  --color-pane-main: var(--pane-main);
+  --radius: 0.5rem;
+  --font-sans: var(--body-font);
+  --font-display: var(--display-font);
 }
 
 html,
@@ -103,7 +429,7 @@ body {
 }
 
 body {
-  background: var(--bg);
+  background: var(--app-bg);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 13.5px;
@@ -133,7 +459,15 @@ button:disabled,
   cursor: not-allowed;
 }
 
-:focus-visible {
+/* shadcn/ui components (data-slot) draw their own focus ring. */
+:focus-visible:not(
+    [data-slot="input"],
+    [data-slot="textarea"],
+    [data-slot="select-trigger"],
+    [data-slot="switch"],
+    [data-slot="checkbox"],
+    [data-slot="button"]
+  ) {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
   border-radius: 6px;

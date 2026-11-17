@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Folder as FolderIcon, Inbox, type LucideIcon, Search, ShieldAlert, Trash2 } from "lucide-react";
 import type { Folder, MessageSummary } from "@/lib/api";
+import { Input } from "@/components/ui/input";
 
 type Props = {
   message: MessageSummary;
@@ -54,7 +55,7 @@ export default function MovePicker({ message, folders, onPick, onClose }: Props)
       >
         <div className="flex items-center gap-2 border-b border-border px-3.5">
           <Search size={15} className="shrink-0 text-subtle" aria-hidden />
-          <input
+          <Input
             ref={inputRef}
             value={filter}
             onChange={(e) => {
@@ -79,7 +80,7 @@ export default function MovePicker({ message, folders, onPick, onClose }: Props)
             aria-label="Filter folders"
             aria-controls="move-options"
             aria-activedescendant={options[current] ? `move-${current}` : undefined}
-            className="h-11 flex-1 bg-transparent text-[13.5px] text-text outline-none placeholder:text-subtle"
+            className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent rounded-none text-[13.5px] md:text-[13.5px]"
           />
           <kbd className="rounded border border-border px-1.5 text-[11px] text-subtle">Esc</kbd>
         </div>

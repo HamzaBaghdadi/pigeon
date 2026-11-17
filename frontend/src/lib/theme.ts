@@ -1,6 +1,8 @@
 export type ThemeChoice = "system" | "light" | "dark";
+export type StyleChoice = "default" | "blossom" | "gilded";
 
 export const THEME_STORAGE_KEY = "pigeon.theme";
+export const STYLE_STORAGE_KEY = "pigeon.style";
 
 /**
  * Applies a theme to the document. "system" removes the override so the
@@ -15,4 +17,20 @@ export function applyTheme(theme: ThemeChoice) {
   } catch {
     /* cache only; Go settings remain the source of truth */
   }
+}
+
+/** Applies a visual style (data-style on <html>); "default" removes it. */
+export function applyStyle(style: StyleChoice) {
+  const root = document.documentElement;
+  if (style === "default") delete root.dataset.style;
+  else root.dataset.style = style;
+  try {
+    localStorage.setItem(STYLE_STORAGE_KEY, style);
+  } catch {
+    /* cache only */
+  }
+}
+
+export function toStyle(v: string | undefined): StyleChoice {
+  return v === "blossom" || v === "gilded" ? v : "default";
 }

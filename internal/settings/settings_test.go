@@ -41,3 +41,23 @@ func TestCorruptFileFallsBack(t *testing.T) {
 		t.Errorf("Theme = %q, want %q", got, ThemeSystem)
 	}
 }
+
+func TestStyle(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "settings.json")
+	s, _ := OpenAt(path)
+	if _, err := s.Update(func(v *Settings) { v.Style = StyleGilded }); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := OpenAt(path)
+	if again.Get().Style != StyleGilded {
+		t.Errorf("style = %q, want gilded", again.Get().Style)
+	}
+
+	if err := os.WriteFile(path, []byte(`{"theme":"dark","style":"neon"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	bad, _ := OpenAt(path)
+	if bad.Get().Style != "" || bad.Get().Theme != ThemeDark {
+		t.Errorf("unknown style should fall back to default: %+v", bad.Get())
+	}
+}

@@ -30,7 +30,7 @@ export function AddAccount($in: $models.AddAccountInput): $CancellablePromise<ma
 }
 
 /**
- * CancelSignIn aborts a pending browser sign-in.
+ * CancelSignIn aborts any pending browser sign-in.
  */
 export function CancelSignIn(): $CancellablePromise<void> {
     return $Call.ByID(638846929);
@@ -51,6 +51,13 @@ export function GetGoogleSetup(): $CancellablePromise<$models.GoogleSetup> {
 }
 
 /**
+ * GetMicrosoftSetup reports whether this build can sign in with Microsoft.
+ */
+export function GetMicrosoftSetup(): $CancellablePromise<$models.MicrosoftSetup> {
+    return $Call.ByID(2930190198);
+}
+
+/**
  * GetSyncStatus returns the current background sync status.
  */
 export function GetSyncStatus(): $CancellablePromise<$models.SyncStatus> {
@@ -65,11 +72,11 @@ export function LoadSampleData(): $CancellablePromise<void> {
 }
 
 /**
- * ReconnectGoogle signs in again for an existing Google account whose access
- * expired or was revoked.
+ * Reconnect signs in again for an existing Google or Microsoft account whose
+ * access expired or was revoked.
  */
-export function ReconnectGoogle(accountID: string): $CancellablePromise<void> {
-    return $Call.ByID(1131260933, accountID);
+export function Reconnect(accountID: string): $CancellablePromise<void> {
+    return $Call.ByID(3695498926, accountID);
 }
 
 /**
@@ -101,6 +108,14 @@ export function SaveGoogleSetup(clientID: string, clientSecret: string): $Cancel
  */
 export function SignInWithGoogle(loginHint: string, name: string): $CancellablePromise<mail$0.Account> {
     return $Call.ByID(1471907708, loginHint, name);
+}
+
+/**
+ * SignInWithMicrosoft opens Microsoft's sign-in page in the browser and, once
+ * the user approves, adds the Outlook.com or Microsoft 365 account.
+ */
+export function SignInWithMicrosoft(loginHint: string, name: string): $CancellablePromise<mail$0.Account> {
+    return $Call.ByID(912115553, loginHint, name);
 }
 
 /**

@@ -48,12 +48,29 @@ func (s *SettingsService) ApplyWindowTheme() {
 	if s.window == nil {
 		return
 	}
-	dark := ResolveDark(s.store.Get().Theme)
+	prefs := s.store.Get()
+	dark := ResolveDark(prefs.Theme)
 	w := s.window
 	application.InvokeAsync(func() {
 		setNativeDark(w, dark)
-		w.SetBackgroundColour(BackgroundFor(dark))
+		w.SetBackgroundColour(BackgroundFor(prefs.Style, dark))
 	})
+}
+
+// SetStyle saves the visual theme ("default", "blossom" or "gilded").
+func (s *SettingsService) SetStyle(style settings.Style) (settings.Settings, error) {
+	if !style.Valid() {
+		return s.store.Get(), errors.New("unknown style: " + string(style))
+	}
+	if style == settings.StyleDefault {
+		style = ""
+	}
+	next, err := s.store.Update(func(v *settings.Settings) { v.Style = style })
+	if err != nil {
+		return next, err
+	}
+	s.ApplyWindowTheme()
+	return next, nil
 }
 
 // WindowTheme maps a saved theme to the Wails window option used at startup.
@@ -82,11 +99,21 @@ func ResolveDark(t settings.Theme) bool {
 
 // BackgroundFor matches the window background to the UI's --bg token so there
 // is no flash of the wrong color while the page loads or resizes.
-func BackgroundFor(dark bool) application.RGBA {
-	if dark {
+func BackgroundFor(style settings.Style, dark bool) application.RGBA {
+	switch {
+	case style == settings.StyleBlossom && dark:
+		return application.NewRGB(0x1a, 0x10, 0x1e)
+	case style == settings.StyleBlossom:
+		return application.NewRGB(0xfd, 0xf2, 0xf7)
+	case style == settings.StyleGilded && dark:
+		return application.NewRGB(0x0b, 0x09, 0x06)
+	case style == settings.StyleGilded:
+		return application.NewRGB(0xf3, 0xec, 0xdc)
+	case dark:
 		return application.NewRGB(0x13, 0x14, 0x17)
+	default:
+		return application.NewRGB(0xf7, 0xf7, 0xf8)
 	}
-	return application.NewRGB(0xf7, 0xf7, 0xf8)
 }
 
 // SetDisplayName sets the name recipients see on mail you send.
@@ -106,4 +133,9 @@ func (s *SettingsService) SetNotifications(on bool) (settings.Settings, error) {
 // SetCloseToTray chooses whether closing the window keeps Pigeon running in the tray.
 func (s *SettingsService) SetCloseToTray(on bool) (settings.Settings, error) {
 	return s.store.Update(func(v *settings.Settings) { v.DisableCloseToTray = !on })
+}
+
+// SetAlwaysShowImages chooses whether remote images load automatically.
+func (s *SettingsService) SetAlwaysShowImages(on bool) (settings.Settings, error) {
+	return s.store.Update(func(v *settings.Settings) { v.AlwaysShowImages = on })
 }

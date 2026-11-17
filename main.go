@@ -77,7 +77,10 @@ func main() {
 	})
 
 	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:     "Pigeon",
+		Title: "Pigeon",
+		// Pigeon draws its own title bar (frontend TitleBar); Windows keeps the
+		// shadow, rounded corners and edge resizing.
+		Frameless: true,
 		Width:     1280,
 		Height:    800,
 		MinWidth:  900,
@@ -90,7 +93,7 @@ func main() {
 		Windows: application.WindowsWindow{
 			Theme: services.WindowTheme(prefs.Theme),
 		},
-		BackgroundColour: services.BackgroundFor(services.ResolveDark(prefs.Theme)),
+		BackgroundColour: services.BackgroundFor(prefs.Style, services.ResolveDark(prefs.Theme)),
 		URL:              "/",
 	})
 	settingsSvc.AttachWindow(window)
