@@ -1,13 +1,14 @@
 name: Release
 
 # Runs when a version tag is pushed, e.g.:  git tag v0.2.0 && git push origin v0.2.0
-# Produces a DRAFT GitHub release; review it and click "Publish" yourself.
+# Builds, signs and publishes the GitHub release. Installed copies pick it up
+# through auto-update, so only push a tag when the version is ready to ship.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write      # create the draft release
+  contents: write      # create the release
   id-token: write      # sign build provenance
   attestations: write  # publish build provenance
 
@@ -98,11 +99,14 @@ jobs:
             dist/*.exe
             dist/*.zip
 
-      - name: Create draft release
+      # Published right away: every step above must pass first (tests, signing,
+      # signature self-check). gh uploads the files before making the release
+      # public, so installed copies never see a release with missing files.
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           gh release create $tag (Get-ChildItem dist).FullName `
-            --draft --generate-notes --title "Pigeon $tag"
+            --generate-notes --title "Pigeon $tag" --latest

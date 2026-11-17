@@ -110,8 +110,15 @@ themselves. Portable copies show **Download** instead of **Restart to update**.
    git push origin v0.2.0
    ```
 
-3. Wait for the **Release** workflow to finish. It creates a **draft** release.
-4. Review the files and notes on GitHub, then click **Publish release**.
+3. Wait for the **Release** workflow to finish. It publishes the release
+   directly, and installed copies start offering the update within hours.
+   Only push a tag when that version is ready for everyone.
+4. Optionally edit the generated notes on GitHub to describe the changes in
+   plain words.
+
+If the workflow fails at any step, nothing is published; fix the problem,
+delete the tag (`git push origin :refs/tags/v0.2.0` and `git tag -d v0.2.0`)
+and tag again.
 
 ## Code signing
 
