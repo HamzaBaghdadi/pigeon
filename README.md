@@ -132,4 +132,4 @@ Found a vulnerability? Please report it privately. See [SECURITY.md](SECURITY.md
 
 ## License
 
-[MIT](LICENSE)
+[Apache License 2.0](LICENSE)
