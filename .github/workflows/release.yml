@@ -76,9 +76,10 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item bin/pigeon-amd64-installer.exe "dist/Pigeon-$tag-windows-setup.exe"
           Compress-Archive -Path bin/pigeon.exe -DestinationPath "dist/Pigeon-$tag-windows-portable.zip"
-          Get-ChildItem dist/*.exe, dist/*.zip | Get-FileHash -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
-            Out-File dist/SHA256SUMS.txt -Encoding ascii
+          # LF line endings so `sha256sum -c` works on Linux and macOS too.
+          $sums = Get-ChildItem dist/*.exe, dist/*.zip | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" }
+          [IO.File]::WriteAllText("$PWD/dist/SHA256SUMS.txt", (($sums -join "`n") + "`n"))
 
       # Installed copies only accept updates whose checksum list is signed with
       # this key (its public half is compiled into the app).
