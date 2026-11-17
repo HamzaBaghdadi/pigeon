@@ -17,7 +17,7 @@
         PackageDisplayName="Pigeon"
         PublisherName="CN=Pigeon"
         PublisherDisplayName="Pigeon"
-        Version="0.1.0.0"
+        Version="0.2.0.0"
         PackageDescription="A secure, open-source email client">
         <Capabilities>
             <Capability Name="runFullTrust" />
