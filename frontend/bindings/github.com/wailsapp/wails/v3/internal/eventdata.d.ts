@@ -13,7 +13,9 @@ declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
             "mail:changed": string;
+            "open:message": string;
             "sync:status": services$0.SyncStatus;
+            "update:status": services$0.UpdateStatus;
         }
     }
 }

@@ -1,4 +1,6 @@
-package imapsync
+// Package xoauth2 implements the XOAUTH2 SASL mechanism (Gmail, Outlook) used
+// to sign in to IMAP and SMTP with an OAuth access token.
+package xoauth2
 
 import (
 	"errors"
@@ -6,15 +8,15 @@ import (
 	"github.com/emersion/go-sasl"
 )
 
-// xoauth2Client implements the XOAUTH2 SASL mechanism used by Gmail and
-// Outlook: https://developers.google.com/gmail/imap/xoauth2-protocol
+// See https://developers.google.com/gmail/imap/xoauth2-protocol
 type xoauth2Client struct {
 	user, token string
 }
 
 var _ sasl.Client = (*xoauth2Client)(nil)
 
-func newXOAuth2Client(user, token string) sasl.Client {
+// NewClient returns a SASL client that signs in as user with an access token.
+func NewClient(user, token string) sasl.Client {
 	return &xoauth2Client{user: user, token: token}
 }
 

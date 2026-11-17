@@ -10,6 +10,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/HamzaBaghdadi/pigeon/internal/imapsync"
+	"github.com/HamzaBaghdadi/pigeon/internal/mail"
 	"github.com/HamzaBaghdadi/pigeon/internal/secrets"
 	"github.com/HamzaBaghdadi/pigeon/internal/settings"
 	"github.com/HamzaBaghdadi/pigeon/internal/store"
@@ -46,6 +47,13 @@ type Core struct {
 	status  SyncStatus
 	trigger chan struct{}
 	cancel  context.CancelFunc
+	ctx     context.Context
+
+	watchMu  sync.Mutex
+	watchers map[string]context.CancelFunc // account ID -> stop push watcher
+
+	// afterSync runs after background syncs (e.g. to refresh the tray).
+	afterSync func()
 }
 
 func passwordKey(accountID string) string { return "account:" + accountID + ":password" }
@@ -95,6 +103,9 @@ func emit(name string, data any) {
 func (c *Core) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
+	c.mu.Lock()
+	c.ctx = ctx
+	c.mu.Unlock()
 	go func() {
 		t := time.NewTicker(syncInterval)
 		defer t.Stop()
@@ -158,6 +169,10 @@ func (c *Core) syncAll(ctx context.Context) {
 		emit(EventMailChanged, a.ID)
 	}
 	c.setStatus(func(s *SyncStatus) { s.Syncing = false; s.LastSync = time.Now() })
+	c.refreshWatchers()
+	if c.afterSync != nil {
+		c.afterSync()
+	}
 }
 
 func (c *Core) setStatus(fn func(*SyncStatus)) {
@@ -182,4 +197,92 @@ func (c *Core) Status() SyncStatus {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.snapshot()
+}
+
+// refreshWatchers starts a push (IDLE) watcher for every real account whose
+// folders are known and stops watchers for removed accounts.
+func (c *Core) refreshWatchers() {
+	c.mu.Lock()
+	ctx := c.ctx
+	c.mu.Unlock()
+	if ctx == nil || ctx.Err() != nil {
+		return
+	}
+	accounts, err := c.store.ListAccounts()
+	if err != nil {
+		return
+	}
+	want := map[string]store.Account{}
+	for _, a := range accounts {
+		if !a.Demo {
+			want[a.ID] = a
+		}
+	}
+	c.watchMu.Lock()
+	defer c.watchMu.Unlock()
+	if c.watchers == nil {
+		c.watchers = map[string]context.CancelFunc{}
+	}
+	for id, stop := range c.watchers {
+		if _, ok := want[id]; !ok {
+			stop()
+			delete(c.watchers, id)
+		}
+	}
+	for id, a := range want {
+		if _, ok := c.watchers[id]; ok {
+			continue
+		}
+		if _, err := c.store.FolderByRole(id, mail.RoleInbox); err != nil {
+			continue // first sync hasn't finished; try again next time
+		}
+		wctx, stop := context.WithCancel(ctx)
+		c.watchers[id] = stop
+		go c.watch(wctx, a)
+	}
+}
+
+// watch keeps an account's push connection alive, reconnecting with backoff.
+func (c *Core) watch(ctx context.Context, a store.Account) {
+	backoff := 5 * time.Second
+	for ctx.Err() == nil {
+		started := time.Now()
+		err := c.engine.Watch(ctx, a, func() {
+			sctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancel()
+			if err := c.engine.SyncInbox(sctx, a); err == nil {
+				emit(EventMailChanged, a.ID)
+				if c.afterSync != nil {
+					c.afterSync()
+				}
+			}
+		})
+		if ctx.Err() != nil {
+			return
+		}
+		if errors.Is(err, imapsync.ErrNoIdle) {
+			return // no push on this server; the periodic sync covers it
+		}
+		if time.Since(started) > 2*time.Minute {
+			backoff = 5 * time.Second // it was working; reconnect quickly
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+		if backoff < 5*time.Minute {
+			backoff *= 2
+		}
+	}
+}
+
+// stopWatcher stops an account's push watcher (e.g. when it's removed).
+func (c *Core) stopWatcher(accountID string) {
+	c.watchMu.Lock()
+	defer c.watchMu.Unlock()
+	if stop, ok := c.watchers[accountID]; ok {
+		stop()
+		delete(c.watchers, accountID)
+	}
 }

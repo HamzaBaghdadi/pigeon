@@ -5,7 +5,7 @@ when you push a version tag. Each release contains:
 
 - `Pigeon-vX.Y.Z-windows-setup.exe`: installer (per-user, no admin rights needed)
 - `Pigeon-vX.Y.Z-windows-portable.zip`: the app without an installer
-- `SHA256SUMS.txt`: checksums
+- `SHA256SUMS.txt` and `SHA256SUMS.txt.sig`: checksums, signed with the update key
 - Signed build provenance, so anyone can verify the files were built from this
   repository: `gh attestation verify <file> --repo HamzaBaghdadi/pigeon`
 
@@ -53,6 +53,39 @@ the user approving access on Google's own page. The client can't be used to
 read anyone's mail without that approval. We still keep it out of the
 repository so it isn't copied into forks and other projects, and so it can be
 rotated without a code change.
+
+## One-time setup: signed auto-updates
+
+Installed copies of Pigeon check GitHub Releases every 6 hours (and 15 seconds
+after launch), download new versions in the background and offer **Restart to
+update**. They only install an update whose `SHA256SUMS.txt` is signed with
+your update key, and only if the installer matches the signed checksum. A
+swapped or corrupted download, or a release file uploaded by someone who can
+edit releases but not run your workflow, is rejected. The private key lives
+only in GitHub's encrypted secrets, so anyone who can change your workflows
+could misuse it: keep two-factor authentication on your GitHub account and
+review workflow changes in pull requests.
+
+1. From the repository root, run:
+
+   ```bash
+   go run ./scripts/update-keys
+   ```
+
+   This writes the **public** key into `internal/updater/pubkey.go` (commit
+   it) and the **private** key to `pigeon-update-signing-key.txt` in your home
+   folder. The private key is never printed.
+2. Add the file's contents as the repository secret
+   `PIGEON_UPDATE_SIGNING_KEY`.
+3. Save the file in a password manager, then delete it. **If you lose it,**
+   copies already installed can't verify updates from a new key, and users will
+   have to download one new version manually.
+
+The release job refuses to run without a public key in the code and the
+signing secret, so you can't accidentally ship an update nobody can install.
+
+Development builds (`dev` version) and portable copies never update
+themselves. Portable copies show **Download** instead of **Restart to update**.
 
 ## Cutting a release
 

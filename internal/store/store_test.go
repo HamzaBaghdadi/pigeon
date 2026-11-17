@@ -23,7 +23,7 @@ func newTestStore(t *testing.T) *Store {
 		role mail.FolderRole
 	}{{"INBOX", mail.RoleInbox}, {"Archive", mail.RoleArchive}} {
 		id := FolderID("a1", f.path)
-		if err := s.UpsertFolder(FolderRow{Folder: mail.Folder{ID: id, AccountID: "a1", Name: f.path, Role: f.role}, Path: f.path}); err != nil {
+		if err := s.UpsertFolder(FolderRow{Folder: mail.Folder{ID: id, AccountID: "a1", Name: f.path, Role: f.role, Path: f.path}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -98,7 +98,7 @@ func TestFlagsMoveAndUnreadCounts(t *testing.T) {
 func TestBodyKeptOnResync(t *testing.T) {
 	s := newTestStore(t)
 	id := addMsg(t, s, 1, "Hi", "", true)
-	if err := s.SetBody(id, "<p>full</p>", "full text", "full text", false); err != nil {
+	if err := s.SetBody(id, "<p>full</p>", "full text", "full text", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	addMsg(t, s, 1, "Hi", "", false) // a later sync refreshes flags only
@@ -145,5 +145,37 @@ func TestMigratesOldAccountsTable(t *testing.T) {
 	a, err := s.GetAccount("x")
 	if err != nil || a.Auth != AuthPassword {
 		t.Fatalf("migrated account = %+v, %v", a, err)
+	}
+}
+
+func TestCcAndContactSuggestions(t *testing.T) {
+	s := newTestStore(t)
+	folder := FolderID("a1", "INBOX")
+	for i, from := range []mail.Address{
+		{Name: "Lina Haddad", Email: "lina@example.com"},
+		{Name: "Lina Haddad", Email: "lina@example.com"},
+		{Name: "Omar Saleh", Email: "omar@example.com"},
+		{Name: "100% Real", Email: "odd_name@example.com"},
+	} {
+		uid := uint32(i + 1)
+		if err := s.UpsertMessage(MessageRow{MessageSummary: mail.MessageSummary{
+			ID: MessageID(folder, uid), AccountID: "a1", FolderID: folder, From: from, Date: time.Unix(int64(uid), 0),
+			Cc: []mail.Address{{Name: "Sara", Email: "sara@example.com"}},
+		}, UID: uid}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, _ := s.GetMessage(MessageID(folder, 1))
+	if len(m.Cc) != 1 || m.Cc[0].Email != "sara@example.com" {
+		t.Fatalf("cc not stored: %+v", m.Cc)
+	}
+	for q, want := range map[string]string{"lin": "lina@example.com", "hadd": "lina@example.com", "OMAR@": "omar@example.com", "100%": "odd_name@example.com"} {
+		got, err := s.SuggestContacts(q, 5)
+		if err != nil || len(got) != 1 || got[0].Email != want {
+			t.Errorf("SuggestContacts(%q) = %+v, %v", q, got, err)
+		}
+	}
+	if got, _ := s.SuggestContacts("%", 5); len(got) != 0 {
+		t.Errorf("wildcard not escaped: %+v", got)
 	}
 }

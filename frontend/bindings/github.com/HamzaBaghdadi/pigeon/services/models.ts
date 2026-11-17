@@ -26,6 +26,53 @@ export interface AddAccountInput {
 }
 
 /**
+ * AttachmentInfo describes a file picked for sending. ID is an opaque ticket:
+ * the UI never handles file paths, so it can only attach files the user chose
+ * in the native dialog.
+ */
+export interface AttachmentInfo {
+    "id": string;
+    "name": string;
+    "size": number;
+}
+
+/**
+ * ComposeMode is how a draft starts.
+ */
+export enum ComposeMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ModeReply = "reply",
+    ModeReplyAll = "replyAll",
+    ModeForward = "forward",
+};
+
+/**
+ * Draft is what the composer edits and sends.
+ */
+export interface Draft {
+    "accountId": string;
+    "to": mail$0.Address[] | null;
+    "cc": mail$0.Address[] | null;
+    "bcc": mail$0.Address[] | null;
+    "subject": string;
+    "body": string;
+
+    /**
+     * ReplyToID is the local ID of the message being answered (threading).
+     */
+    "replyToId": string;
+
+    /**
+     * Attachments are tickets from PickAttachments.
+     */
+    "attachments": AttachmentInfo[] | null;
+}
+
+/**
  * GoogleSetup describes whether Sign in with Google is ready to use.
  */
 export interface GoogleSetup {
@@ -36,6 +83,26 @@ export interface GoogleSetup {
      * BuiltIn is true when the app ships with its own client (official builds).
      */
     "builtIn": boolean;
+}
+
+/**
+ * HistoryResult reports a load-older or server-search request.
+ */
+export interface HistoryResult {
+    /**
+     * Added is how many messages were downloaded.
+     */
+    "added": number;
+
+    /**
+     * Done is true when no older mail is left on the server.
+     */
+    "done": boolean;
+
+    /**
+     * Matched is how many messages on the server matched (search only).
+     */
+    "matched": number;
 }
 
 /**
@@ -51,6 +118,11 @@ export interface MoveResult {
      * From is the role of the folder it came from.
      */
     "from": mail$0.FolderRole;
+
+    /**
+     * FromFolder is the ID of the folder it came from (for undo).
+     */
+    "fromFolder": string;
 }
 
 /**
@@ -64,4 +136,58 @@ export interface SyncStatus {
      * account ID -> message
      */
     "errors": { [_ in string]?: string } | null;
+}
+
+/**
+ * UpdateState is where the updater is.
+ */
+export enum UpdateState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * dev build or no signing key
+     */
+    UpdateDisabled = "disabled",
+
+    /**
+     * not checked yet
+     */
+    UpdateIdle = "idle",
+    UpdateChecking = "checking",
+    UpdateUpToDate = "up-to-date",
+    UpdateDownloading = "downloading",
+
+    /**
+     * verified installer downloaded
+     */
+    UpdateReady = "ready",
+
+    /**
+     * portable copy: download manually
+     */
+    UpdateAvailable = "available",
+    UpdateError = "error",
+};
+
+/**
+ * UpdateStatus is shown in Settings → About and the update banner.
+ */
+export interface UpdateStatus {
+    "state": UpdateState;
+    "current": string;
+    "latest": string;
+    "notes": string;
+    "url": string;
+    "error": string;
+
+    /**
+     * why updates are disabled
+     */
+    "reason": string;
+    "autoCheck": boolean;
+    "portable": boolean;
+    "lastChecked": string;
 }

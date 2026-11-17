@@ -59,13 +59,16 @@ func (s *MailService) GetMessage(id string) (mail.MessageBody, error) {
 	if err != nil {
 		return mail.MessageBody{}, err
 	}
-	if !m.BodyFetched {
+	// Download the body if needed, or re-read messages stored before Pigeon
+	// indexed attachments and embedded images.
+	needsParts := m.BodyFetched && !m.PartsIndexed && (m.HasAttachments || strings.Contains(strings.ToLower(m.BodyHTML), "cid:"))
+	if !m.BodyFetched || needsParts {
 		a, err := s.core.store.GetAccount(m.AccountID)
 		if err != nil {
 			return mail.MessageBody{}, err
 		}
 		if !a.Demo {
-			if err := s.core.engine.FetchBody(a, m); err != nil {
+			if err := s.core.engine.FetchBody(a, m); err != nil && !m.BodyFetched {
 				return mail.MessageBody{}, fmt.Errorf("couldn't download this message: %w", err)
 			}
 			if m, err = s.core.store.GetMessage(id); err != nil {
@@ -77,8 +80,19 @@ func (s *MailService) GetMessage(id string) (mail.MessageBody, error) {
 	if strings.TrimSpace(raw) == "" {
 		raw = textToHTML(m.BodyText)
 	}
+	if images, err := s.core.store.InlineImages(id); err == nil {
+		raw = inlineImages(raw, images)
+	}
 	clean := sanitize.HTML(raw)
-	return mail.MessageBody{ID: id, HTML: clean.HTML, Text: m.BodyText, RemoteImages: clean.RemoteImages}, nil
+	body := mail.MessageBody{ID: id, HTML: clean.HTML, Text: m.BodyText, RemoteImages: clean.RemoteImages, Attachments: []mail.Attachment{}}
+	if parts, err := s.core.store.ListParts(id); err == nil {
+		for _, p := range parts {
+			if !p.Inline {
+				body.Attachments = append(body.Attachments, p)
+			}
+		}
+	}
+	return body, nil
 }
 
 // SetRead marks a message read or unread.
@@ -120,6 +134,8 @@ type MoveResult struct {
 	ID string `json:"id"`
 	// From is the role of the folder it came from.
 	From mail.FolderRole `json:"from"`
+	// FromFolder is the ID of the folder it came from (for undo).
+	FromFolder string `json:"fromFolder"`
 }
 
 // Move moves a message to the account's folder with the given role.
@@ -138,7 +154,33 @@ func (s *MailService) Move(id string, role mail.FolderRole) (MoveResult, error) 
 	} else if err != nil {
 		return MoveResult{}, err
 	}
-	res := MoveResult{From: from.Role}
+	return s.moveTo(m, a, from, to)
+}
+
+// MoveToFolder moves a message to a specific folder of its account.
+func (s *MailService) MoveToFolder(id, folderID string) (MoveResult, error) {
+	m, a, err := s.load(id)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	from, err := s.core.store.GetFolder(m.FolderID)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	to, err := s.core.store.GetFolder(folderID)
+	if err != nil || to.AccountID != a.ID {
+		return MoveResult{}, errors.New("that folder belongs to a different account")
+	}
+	if to.ID == from.ID {
+		return MoveResult{ID: m.ID, From: from.Role, FromFolder: from.ID}, nil
+	}
+	return s.moveTo(m, a, from, to)
+}
+
+func (s *MailService) moveTo(m store.MessageRow, a store.Account, from, to store.FolderRow) (MoveResult, error) {
+	id := m.ID
+	var err error
+	res := MoveResult{From: from.Role, FromFolder: from.ID}
 	if a.Demo {
 		res.ID, err = s.core.store.MoveLocal(id, to.ID, uint32(time.Now().UnixNano()&0x7fffffff))
 		return res, err

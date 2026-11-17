@@ -14,7 +14,17 @@ import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 export const MailChanged = "mail:changed";
 
 /**
+ * Name of the custom event "open:message".
+ */
+export const OpenMessage = "open:message";
+
+/**
  * Name of the custom event "sync:status".
  */
 export const SyncStatus = "sync:status";
+
+/**
+ * Name of the custom event "update:status".
+ */
+export const UpdateStatus = "update:status";
 

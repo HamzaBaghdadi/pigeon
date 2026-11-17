@@ -32,11 +32,23 @@ func loadDemo(st *store.Store) error {
 		}
 		for _, r := range roles {
 			if err := st.UpsertFolder(store.FolderRow{
-				Folder: mail.Folder{ID: store.FolderID(a.ID, r.name), AccountID: a.ID, Name: r.name, Role: r.role},
-				Path:   r.name,
+				Folder: mail.Folder{ID: store.FolderID(a.ID, r.name), AccountID: a.ID, Name: r.name, Role: r.role, Path: r.name},
 			}); err != nil {
 				return err
 			}
+		}
+	}
+
+	// A few of the user's own folders, including a nested one.
+	for _, cf := range []struct{ account, path, name string }{
+		{"demo-personal", "Receipts", "Receipts"},
+		{"demo-personal", "Travel", "Travel"},
+		{"demo-side", "Pigeon/Design", "Design"},
+	} {
+		if err := st.UpsertFolder(store.FolderRow{
+			Folder: mail.Folder{ID: store.FolderID(cf.account, cf.path), AccountID: cf.account, Name: cf.name, Role: mail.RoleCustom, Path: cf.path},
+		}); err != nil {
+			return err
 		}
 	}
 
@@ -96,6 +108,10 @@ func loadDemo(st *store.Store) error {
 			6 * time.Hour, false, false, false, `<p>Sounds great, see you Saturday at 10!</p>`},
 		{"demo-work", "Drafts", "Me", "me@work.example", "Proposal: encrypted local cache",
 			8 * time.Hour, false, false, false, `<p>Draft — outline for encrypting the SQLite cache at rest.</p>`},
+		{"demo-personal", "Receipts", "Coffee Corner", "receipts@coffee.example", "Your receipt from Coffee Corner",
+			9 * 24 * time.Hour, false, false, false, `<p>Thanks for your visit! Flat white × 2 — $8.40</p>`},
+		{"demo-personal", "Travel", "Skyways", "trips@skyways.example", "Your trip to Lisbon is confirmed",
+			14 * 24 * time.Hour, false, true, false, `<p>Booking ref <b>PGN42X</b>. Departs Fri 9:05 AM, seat 14A.</p>`},
 		{"demo-personal", "Spam", "Prize Department", "winner@lottery.example", "You have WON $1,000,000!!!",
 			12 * time.Hour, true, false, false, `<p>Click <a href="https://lottery.example/claim">here</a> to claim your prize.</p>`},
 	}
@@ -121,6 +137,25 @@ func loadDemo(st *store.Store) error {
 		}); err != nil {
 			return err
 		}
+		if files := demoAttachments[d.subject]; len(files) > 0 {
+			id := store.MessageID(folder, uid)
+			if err := st.SetBody(id, d.body, text, mailparse.Snippet(text, 200), true, files); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// demoAttachments are example files listed on sample messages (names and
+// sizes only; sample messages have no real file data).
+var demoAttachments = map[string][]store.Part{
+	"Q4 roadmap review — notes and next steps": {
+		{Attachment: mail.Attachment{Index: 0, Filename: "Q4 roadmap.pdf", ContentType: "application/pdf", Size: 1_284_000}},
+		{Attachment: mail.Attachment{Index: 1, Filename: "decisions.xlsx", ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Size: 48_200}},
+	},
+	"Pigeon icon set — first draft": {
+		{Attachment: mail.Attachment{Index: 0, Filename: "pigeon-icons.zip", ContentType: "application/zip", Size: 3_400_000}},
+		{Attachment: mail.Attachment{Index: 1, Filename: "preview.png", ContentType: "image/png", Size: 512_000}},
+	},
 }

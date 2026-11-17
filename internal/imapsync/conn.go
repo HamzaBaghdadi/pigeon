@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/emersion/go-imap/v2/imapclient"
+
+	"github.com/HamzaBaghdadi/pigeon/internal/xoauth2"
 )
 
 // Security is how the connection is encrypted. Plaintext is deliberately not
@@ -39,9 +41,15 @@ func (c Config) addr() string { return net.JoinHostPort(c.Host, fmt.Sprint(c.Por
 
 // Connect dials and logs in.
 func Connect(cfg Config) (*imapclient.Client, error) {
+	return connect(cfg, nil)
+}
+
+// connect dials and logs in, delivering server pushes to h (may be nil).
+func connect(cfg Config, h *imapclient.UnilateralDataHandler) (*imapclient.Client, error) {
 	opts := &imapclient.Options{
-		TLSConfig: &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12},
-		Dialer:    &net.Dialer{Timeout: 20 * time.Second},
+		TLSConfig:             &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12},
+		Dialer:                &net.Dialer{Timeout: 20 * time.Second},
+		UnilateralDataHandler: h,
 	}
 	var (
 		c   *imapclient.Client
@@ -61,7 +69,7 @@ func Connect(cfg Config) (*imapclient.Client, error) {
 		return nil, friendlyDialError(cfg, err)
 	}
 	if cfg.AccessToken != "" {
-		err = c.Authenticate(newXOAuth2Client(cfg.Username, cfg.AccessToken))
+		err = c.Authenticate(xoauth2.NewClient(cfg.Username, cfg.AccessToken))
 	} else {
 		err = c.Login(cfg.Username, cfg.Password).Wait()
 	}

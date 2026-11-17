@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
@@ -43,11 +44,15 @@ type CredentialsFunc func(a store.Account) (Credentials, error)
 // Engine syncs accounts and performs mailbox actions. One cached connection
 // per account is reused and serialized with a mutex.
 type Engine struct {
-	store    *store.Store
+	store *store.Store
 	creds CredentialsFunc
 
 	mu    sync.Mutex
 	conns map[string]*session
+
+	// OnNewMail is called with messages that arrived in an inbox since the
+	// previous sync (never on an account's first sync).
+	OnNewMail func(a store.Account, msgs []store.MessageRow)
 }
 
 type session struct {
@@ -169,6 +174,8 @@ func (s *session) ensureWritable(path string) error {
 
 // SyncAccount refreshes folders, recent messages, flags and bodies.
 func (e *Engine) SyncAccount(ctx context.Context, a store.Account) error {
+	var arrived []string
+	defer func() { e.reportNew(a, arrived) }()
 	return e.with(a, func(s *session) error {
 		folders, err := e.syncFolders(s, a)
 		if err != nil {
@@ -181,8 +188,12 @@ func (e *Engine) SyncAccount(ctx context.Context, a store.Account) error {
 			if _, ok := windowByRole[f.Role]; !ok {
 				continue
 			}
-			if err := e.syncFolder(s, f); err != nil {
+			ids, err := e.syncFolder(s, f)
+			if err != nil {
 				return fmt.Errorf("%s: %w", f.Name, err)
+			}
+			if f.Role == mail.RoleInbox {
+				arrived = append(arrived, ids...)
 			}
 		}
 		// Bodies second, so the message list fills in fast on first sync.
@@ -228,7 +239,7 @@ func (e *Engine) syncFolders(s *session, a store.Account) ([]store.FolderRow, er
 			if role != mail.RoleCustom {
 				taken[role] = true
 			}
-			f := store.FolderRow{Folder: mail.Folder{ID: id, AccountID: a.ID, Name: displayName(l.Mailbox, l.Delim), Role: role}, Path: l.Mailbox}
+			f := store.FolderRow{Folder: mail.Folder{ID: id, AccountID: a.ID, Name: displayName(l.Mailbox, l.Delim), Role: role, Path: l.Mailbox}}
 			if err := e.store.UpsertFolder(f); err != nil {
 				return nil, err
 			}
@@ -242,28 +253,41 @@ func (e *Engine) syncFolders(s *session, a store.Account) ([]store.FolderRow, er
 	return out, nil
 }
 
-func (e *Engine) syncFolder(s *session, f store.FolderRow) error {
+// syncFolder refreshes one folder and returns the IDs of messages that
+// arrived since the last sync (unread, with a higher UID than anything we
+// had). A folder's first sync reports nothing, so linking an account doesn't
+// produce a flood of "new mail".
+func (e *Engine) syncFolder(s *session, f store.FolderRow) ([]string, error) {
 	stored, err := e.store.GetFolder(f.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sel, err := s.selectFolder(f.Path, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	known := stored.UIDValidity != 0 && stored.UIDValidity == sel.UIDValidity
 	if stored.UIDValidity != sel.UIDValidity {
 		if err := e.store.ResetFolder(f.ID, sel.UIDValidity); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	local, err := e.store.FolderUIDs(f.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var maxLocal uint32
+	for uid := range local {
+		if uid > maxLocal {
+			maxLocal = uid
+		}
+	}
+	var arrived []string
 	seen := map[uint32]bool{}
+	var windowStart uint32 // lowest UID in the newest-N window
 	if sel.NumMessages > 0 {
 		start := uint32(1)
-		if w := windowByRole[f.Role]; sel.NumMessages > w {
+		if w := windowFor(f.Role); sel.NumMessages > w {
 			start = sel.NumMessages - w + 1
 		}
 		var seq imap.SeqSet
@@ -272,25 +296,123 @@ func (e *Engine) syncFolder(s *session, f store.FolderRow) error {
 			UID: true, Flags: true, Envelope: true, InternalDate: true, RFC822Size: true,
 		}).Collect()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, m := range msgs {
 			uid := uint32(m.UID)
 			seen[uid] = true
-			if err := e.store.UpsertMessage(rowFromFetch(f, m)); err != nil {
-				return err
+			if windowStart == 0 || uid < windowStart {
+				windowStart = uid
+			}
+			row := rowFromFetch(f, m)
+			if err := e.store.UpsertMessage(row); err != nil {
+				return nil, err
+			}
+			if known && uid > maxLocal && row.Unread {
+				arrived = append(arrived, row.ID)
 			}
 		}
 	}
-	// Anything we have that the server no longer lists (in our window) is gone.
+
+	switch {
+	case sel.NumMessages == 0:
+		err = e.store.SetFolderFloor(f.ID, 1) // empty folder: fully loaded
+	case windowStart != 0 && (stored.FloorUID == 0 || !known || windowStart < stored.FloorUID):
+		err = e.store.SetFolderFloor(f.ID, windowStart)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Inside the window, anything the server no longer lists is gone.
+	// Older mail the user loaded is checked separately so it isn't dropped.
+	var older []imap.UID
 	for uid, id := range local {
-		if !seen[uid] {
+		switch {
+		case seen[uid]:
+		case windowStart != 0 && uid < windowStart:
+			older = append(older, imap.UID(uid))
+		default:
 			if err := e.store.DeleteMessage(id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(older) > 0 {
+		if err := e.refreshOlder(s, f, local, older); err != nil {
+			return nil, err
+		}
+	}
+	return arrived, nil
+}
+
+// refreshOlder updates flags for previously loaded older messages and removes
+// the ones deleted on the server.
+func (e *Engine) refreshOlder(s *session, f store.FolderRow, local map[uint32]string, uids []imap.UID) error {
+	msgs, err := s.client.Fetch(imap.UIDSetNum(uids...), &imap.FetchOptions{UID: true, Flags: true}).Collect()
+	if err != nil {
+		return err
+	}
+	still := map[uint32]bool{}
+	for _, m := range msgs {
+		uid := uint32(m.UID)
+		still[uid] = true
+		unread, starred := !hasFlag(m.Flags, imap.FlagSeen), hasFlag(m.Flags, imap.FlagFlagged)
+		if err := e.store.SetFlags(local[uid], &unread, &starred); err != nil {
+			return err
+		}
+	}
+	for _, uid := range uids {
+		if !still[uint32(uid)] {
+			if err := e.store.DeleteMessage(local[uint32(uid)]); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// windowFor is how many recent messages are kept in sync for a folder.
+func windowFor(role mail.FolderRole) uint32 {
+	if w, ok := windowByRole[role]; ok {
+		return w
+	}
+	return 100 // folders and labels the user opens
+}
+
+// SyncInbox quickly refreshes just the inbox (used when the server pushes a
+// change). Falls back to a full sync if folders aren't known yet.
+func (e *Engine) SyncInbox(ctx context.Context, a store.Account) error {
+	inbox, err := e.store.FolderByRole(a.ID, mail.RoleInbox)
+	if err != nil {
+		return e.SyncAccount(ctx, a)
+	}
+	var arrived []string
+	err = e.with(a, func(s *session) error {
+		var err error
+		if arrived, err = e.syncFolder(s, inbox); err != nil {
+			return err
+		}
+		return e.prefetchBodies(s, inbox)
+	})
+	e.reportNew(a, arrived)
+	return err
+}
+
+// reportNew passes newly arrived messages (with bodies, for previews) to OnNewMail.
+func (e *Engine) reportNew(a store.Account, ids []string) {
+	if e.OnNewMail == nil || len(ids) == 0 {
+		return
+	}
+	var rows []store.MessageRow
+	for _, id := range ids {
+		if m, err := e.store.GetMessage(id); err == nil {
+			rows = append(rows, m)
+		}
+	}
+	if len(rows) > 0 {
+		e.OnNewMail(a, rows)
+	}
 }
 
 func rowFromFetch(f store.FolderRow, m *imapclient.FetchMessageBuffer) store.MessageRow {
@@ -318,6 +440,9 @@ func rowFromFetch(f store.FolderRow, m *imapclient.FetchMessageBuffer) store.Mes
 		}
 		for _, t := range env.To {
 			r.To = append(r.To, mail.Address{Name: t.Name, Email: t.Addr()})
+		}
+		for _, c := range env.Cc {
+			r.Cc = append(r.Cc, mail.Address{Name: c.Name, Email: c.Addr()})
 		}
 	}
 	return r
@@ -358,7 +483,14 @@ func (e *Engine) fetchBodies(s *session, uids imap.UIDSet, byUID map[uint32]stri
 		if err != nil {
 			body = mailparse.Body{Text: "(Pigeon couldn't read this message's content.)"}
 		}
-		if err := e.store.SetBody(id, body.HTML, body.Text, body.Snippet, body.HasAttachments); err != nil {
+		parts := make([]store.Part, len(body.Parts))
+		for i, p := range body.Parts {
+			parts[i] = store.Part{Attachment: mail.Attachment{
+				Index: p.Index, Filename: p.Filename, ContentType: p.ContentType,
+				Size: p.Size, ContentID: p.ContentID, Inline: p.Inline,
+			}, Data: p.Data}
+		}
+		if err := e.store.SetBody(id, body.HTML, body.Text, body.Snippet, body.HasAttachments, parts); err != nil {
 			return err
 		}
 	}
@@ -506,4 +638,29 @@ func displayName(path string, delim rune) string {
 		}
 	}
 	return path
+}
+
+// AppendSent stores a copy of a sent message in the account's Sent folder
+// (marked read). Providers whose SMTP servers file sent mail themselves
+// (Gmail, Outlook) don't need this.
+func (e *Engine) AppendSent(a store.Account, raw []byte) error {
+	sent, err := e.store.FolderByRole(a.ID, mail.RoleSent)
+	if err != nil {
+		return fmt.Errorf("no Sent folder: %w", err)
+	}
+	return e.with(a, func(s *session) error {
+		cmd := s.client.Append(sent.Path, int64(len(raw)), &imap.AppendOptions{
+			Flags: []imap.Flag{imap.FlagSeen},
+			Time:  time.Now(),
+		})
+		if _, err := cmd.Write(raw); err != nil {
+			cmd.Close()
+			return err
+		}
+		if err := cmd.Close(); err != nil {
+			return err
+		}
+		_, err := cmd.Wait()
+		return err
+	})
 }

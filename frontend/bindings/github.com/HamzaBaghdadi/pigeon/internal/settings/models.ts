@@ -12,6 +12,32 @@ export interface Settings {
      * Its secret is kept in the OS keychain, not here.
      */
     "googleClientId"?: string;
+
+    /**
+     * DisableAutoUpdate turns off background update checks (on by default).
+     */
+    "disableAutoUpdate"?: boolean;
+
+    /**
+     * DisplayName is the name recipients see on mail you send.
+     */
+    "displayName"?: string;
+
+    /**
+     * DisableNotifications turns off new-mail notifications (on by default).
+     */
+    "disableNotifications"?: boolean;
+
+    /**
+     * DisableCloseToTray makes closing the window quit Pigeon instead of
+     * keeping it running in the system tray (tray is the default).
+     */
+    "disableCloseToTray"?: boolean;
+
+    /**
+     * TrayHintShown records that the "still running in the tray" tip was shown.
+     */
+    "trayHintShown"?: boolean;
 }
 
 /**

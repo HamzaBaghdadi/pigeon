@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AtSign, Keyboard, Palette, Plus, X } from "lucide-react";
+import { AtSign, Bell, Info, Keyboard, Loader2, Palette, Plus, X } from "lucide-react";
 import type { ThemeChoice } from "@/lib/theme";
-import { api, errorMessage, type Account, type GoogleSetup as Setup } from "@/lib/api";
+import { api, errorMessage, type Account, type GoogleSetup as Setup, type UpdateStatus } from "@/lib/api";
 import GoogleSetup, { GoogleMark } from "./GoogleSetup";
 
 type Props = {
@@ -17,9 +17,12 @@ type Props = {
   onAddAccount: () => void;
   onRemoveAccount: (id: string) => Promise<void>;
   onRemoveSamples: () => Promise<void>;
+  update: UpdateStatus | null;
+  onUpdateChange: (s: UpdateStatus) => void;
+  onInstallUpdate: () => void;
 };
 
-export type Section = "accounts" | "appearance" | "shortcuts";
+export type Section = "accounts" | "appearance" | "notifications" | "shortcuts" | "about";
 
 const themeOptions: { value: ThemeChoice; label: string; hint: string }[] = [
   { value: "system", label: "System", hint: "Match Windows" },
@@ -30,7 +33,11 @@ const themeOptions: { value: ThemeChoice; label: string; hint: string }[] = [
 const shortcuts: [string, string][] = [
   ["J / ↓", "Next message"],
   ["K / ↑", "Previous message"],
+  ["C", "New message"],
+  ["R / A / F", "Reply / Reply all / Forward"],
+  ["Ctrl ↵", "Send"],
   ["E", "Archive"],
+  ["M", "Move to folder"],
   ["# / Delete", "Move to Trash"],
   ["S", "Star / unstar"],
   ["U", "Mark read / unread"],
@@ -81,7 +88,9 @@ export default function SettingsDialog(props: Props) {
           </h2>
           <NavItem icon={AtSign} label="Accounts" active={section === "accounts"} onClick={() => setSection("accounts")} />
           <NavItem icon={Palette} label="Appearance" active={section === "appearance"} onClick={() => setSection("appearance")} />
+          <NavItem icon={Bell} label="Notifications" active={section === "notifications"} onClick={() => setSection("notifications")} />
           <NavItem icon={Keyboard} label="Shortcuts" active={section === "shortcuts"} onClick={() => setSection("shortcuts")} />
+          <NavItem icon={Info} label="About" active={section === "about"} onClick={() => setSection("about")} />
         </nav>
 
         <div className="relative min-w-0 flex-1 overflow-y-auto px-7 py-6">
@@ -94,7 +103,11 @@ export default function SettingsDialog(props: Props) {
             <X size={16} />
           </button>
 
-          {section === "accounts" ? (
+          {section === "notifications" ? (
+            <NotificationsSection />
+          ) : section === "about" ? (
+            <AboutSection update={props.update} onChange={props.onUpdateChange} onInstall={props.onInstallUpdate} />
+          ) : section === "accounts" ? (
             <AccountsSection {...props} />
           ) : section === "appearance" ? (
             <section aria-labelledby="theme-label">
@@ -267,6 +280,8 @@ function AccountsSection(props: Props) {
         </button>
       </div>
 
+      <NameField />
+
       {real.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-6 text-center text-[12.5px] text-subtle">No accounts yet.</p>
       ) : (
@@ -404,5 +419,237 @@ function GoogleSection() {
         </div>
       )}
     </div>
+  );
+}
+
+function AboutSection({ update, onChange, onInstall }: { update: UpdateStatus | null; onChange: (s: UpdateStatus) => void; onInstall: () => void }) {
+  const [checking, setChecking] = useState(false);
+  if (!update) return null;
+  const disabled = update.state === "disabled";
+  const busy = checking || update.state === "checking" || update.state === "downloading";
+
+  let line: string;
+  switch (update.state) {
+    case "disabled":
+      line = update.reason;
+      break;
+    case "checking":
+      line = "Checking for updates…";
+      break;
+    case "downloading":
+      line = `Downloading Pigeon ${update.latest}…`;
+      break;
+    case "ready":
+      line = `Pigeon ${update.latest} is downloaded and verified. Restart to finish updating.`;
+      break;
+    case "available":
+      line = `Pigeon ${update.latest} is available. This copy is portable, so download the new version from GitHub.`;
+      break;
+    case "up-to-date":
+      line = "You're on the latest version.";
+      break;
+    case "error":
+      line = `Couldn't check for updates: ${update.error}`;
+      break;
+    default:
+      line = "Pigeon checks for updates automatically.";
+  }
+
+  return (
+    <section aria-labelledby="about-label">
+      <div className="flex items-center gap-3.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/pigeon.png" alt="" className="h-12 w-12" draggable={false} />
+        <div>
+          <h3 id="about-label" className="text-[15px] font-semibold">
+            Pigeon
+          </h3>
+          <p className="text-[12.5px] text-subtle">Version {update.current === "dev" ? "dev (local build)" : update.current}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-border p-4">
+        <h4 className="text-[13px] font-semibold">Updates</h4>
+        <p className={`mt-1 text-[12.5px] leading-snug ${update.state === "error" ? "text-danger" : "text-muted"}`} role="status">
+          {busy && <Loader2 size={12} className="mr-1.5 inline animate-spin" aria-hidden />}
+          {line}
+        </p>
+        {update.state === "ready" || update.state === "available" ? (
+          <div className="mt-3 flex items-center gap-2">
+            {update.state === "ready" ? (
+              <button onClick={onInstall} className="h-8 rounded-md bg-primary px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-primary-hover">
+                Restart to update
+              </button>
+            ) : (
+              <button onClick={() => api.openExternal(update.url)} className="h-8 rounded-md bg-primary px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-primary-hover">
+                Download
+              </button>
+            )}
+            {update.url && (
+              <button onClick={() => api.openExternal(update.url)} className="h-8 rounded-md px-3 text-[13px] text-muted transition-colors hover:bg-hover hover:text-text">
+                What&apos;s new
+              </button>
+            )}
+          </div>
+        ) : (
+          !disabled && (
+            <button
+              disabled={busy}
+              onClick={async () => {
+                setChecking(true);
+                try {
+                  onChange(await api.checkForUpdates());
+                } finally {
+                  setChecking(false);
+                }
+              }}
+              className="mt-3 h-8 rounded-md border border-border px-3.5 text-[13px] font-medium transition-colors hover:bg-hover disabled:opacity-50"
+            >
+              Check for updates
+            </button>
+          )
+        )}
+
+        {!disabled && (
+          <label className="mt-4 flex items-start gap-2.5 text-[12.5px]">
+            <input
+              type="checkbox"
+              checked={update.autoCheck}
+              onChange={async (e) => onChange(await api.setAutoUpdate(e.target.checked))}
+              className="mt-0.5 h-3.5 w-3.5 accent-[var(--primary)]"
+            />
+            <span>
+              <span className="font-medium">Check for updates automatically</span>
+              <span className="block text-subtle">Updates are verified with Pigeon&apos;s signing key before they&apos;re installed.</span>
+            </span>
+          </label>
+        )}
+      </div>
+
+      <div className="mt-4 flex gap-4 text-[12.5px]">
+        <button onClick={() => api.openExternal("https://github.com/HamzaBaghdadi/pigeon")} className="font-medium text-primary hover:underline">
+          Source code
+        </button>
+        <button onClick={() => api.openExternal("https://github.com/HamzaBaghdadi/pigeon/releases")} className="font-medium text-primary hover:underline">
+          All releases
+        </button>
+        <button onClick={() => api.openExternal("https://github.com/HamzaBaghdadi/pigeon/issues")} className="font-medium text-primary hover:underline">
+          Report a problem
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function NameField() {
+  const [name, setName] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    api.getSettings().then((s) => setName(s.displayName ?? ""));
+  }, []);
+  if (name === null) return null;
+  return (
+    <div className="mt-4">
+      <label htmlFor="display-name" className="text-[12.5px] font-medium">
+        Your name
+      </label>
+      <p className="text-[12px] text-subtle">Shown to people you email, e.g. “Hamza Baghdadi”.</p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <input
+          id="display-name"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setSaved(false);
+          }}
+          onBlur={async () => {
+            const s = await api.setDisplayName(name);
+            setName(s.displayName ?? "");
+            setSaved(true);
+          }}
+          placeholder="Your full name"
+          className="h-8 w-full max-w-[320px] rounded-md border border-border bg-surface px-3 text-[13px] outline-none transition-[border-color,box-shadow] duration-150 hover:border-border-strong focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
+        />
+        {saved && <span className="text-[12px] text-subtle" role="status">Saved</span>}
+      </div>
+    </div>
+  );
+}
+
+function NotificationsSection() {
+  const [s, setS] = useState<{ notify: boolean; tray: boolean } | null>(null);
+  const [tested, setTested] = useState<string | null>(null);
+  useEffect(() => {
+    api.getSettings().then((v) => setS({ notify: !v.disableNotifications, tray: !v.disableCloseToTray }));
+  }, []);
+  if (!s) return null;
+  return (
+    <section aria-labelledby="notif-label">
+      <h3 id="notif-label" className="text-[13.5px] font-semibold">
+        Notifications
+      </h3>
+      <p className="mt-0.5 text-[12.5px] text-subtle">New mail arrives within seconds on Gmail, iCloud, Fastmail and most IMAP servers.</p>
+
+      <div className="mt-4 divide-y divide-border rounded-lg border border-border">
+        <Toggle
+          label="Show a notification for new mail"
+          hint="Not while you're looking at Pigeon. Click a notification to open the message."
+          checked={s.notify}
+          onChange={async (on) => {
+            const v = await api.setNotifications(on);
+            setS((cur) => cur && { ...cur, notify: !v.disableNotifications });
+          }}
+        />
+        <Toggle
+          label="Keep Pigeon running when the window is closed"
+          hint="Pigeon stays in the system tray so new mail still reaches you. Quit from the tray icon."
+          checked={s.tray}
+          onChange={async (on) => {
+            const v = await api.setCloseToTray(on);
+            setS((cur) => cur && { ...cur, tray: !v.disableCloseToTray });
+          }}
+        />
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          onClick={async () => {
+            try {
+              await api.sendTestNotification();
+              setTested("Sent. If nothing appeared, check Windows Settings → System → Notifications.");
+            } catch (err) {
+              setTested(errorMessage(err));
+            }
+          }}
+          className="h-8 rounded-md border border-border px-3.5 text-[13px] font-medium transition-colors hover:bg-hover"
+        >
+          Send a test notification
+        </button>
+        {tested && <span className="text-[12px] text-subtle" role="status">{tested}</span>}
+      </div>
+    </section>
+  );
+}
+
+function Toggle(props: { label: string; hint: string; checked: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-3 px-3.5 py-3">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-medium">{props.label}</span>
+        <span className="block text-[12px] text-subtle">{props.hint}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={props.checked}
+        aria-label={props.label}
+        onClick={() => props.onChange(!props.checked)}
+        className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${props.checked ? "bg-primary" : "bg-border-strong"}`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left] duration-150 ${props.checked ? "left-[18px]" : "left-0.5"}`}
+        />
+      </button>
+    </label>
   );
 }

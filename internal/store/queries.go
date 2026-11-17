@@ -107,8 +107,10 @@ func (s *Store) DeleteDemoAccounts() error {
 // FolderRow is a stored folder with its server path and sync state.
 type FolderRow struct {
 	mail.Folder
-	Path        string
 	UIDValidity uint32
+	// FloorUID is the lowest UID down to which the folder's history is
+	// loaded without gaps (0 = not synced yet, 1 = everything).
+	FloorUID uint32
 }
 
 func FolderID(accountID, path string) string { return accountID + "|" + path }
@@ -131,7 +133,7 @@ func (s *Store) ResetFolder(folderID string, uidValidity uint32) error {
 	if _, err := tx.Exec(`DELETE FROM messages WHERE folder_id = ?`, folderID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE folders SET uidvalidity = ? WHERE id = ?`, uidValidity, folderID); err != nil {
+	if _, err := tx.Exec(`UPDATE folders SET uidvalidity = ?, floor_uid = 0 WHERE id = ?`, uidValidity, folderID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -153,13 +155,13 @@ func (s *Store) DeleteFoldersExcept(accountID string, keep []string) error {
 	return err
 }
 
-const folderCols = `f.id, f.account_id, f.path, f.name, f.role, f.uidvalidity,
+const folderCols = `f.id, f.account_id, f.path, f.name, f.role, f.uidvalidity, f.floor_uid,
 	(SELECT count(*) FROM messages m WHERE m.folder_id = f.id AND m.unread = 1)`
 
 func scanFolder(sc interface{ Scan(...any) error }) (FolderRow, error) {
 	var f FolderRow
 	var role string
-	err := sc.Scan(&f.ID, &f.AccountID, &f.Path, &f.Name, &role, &f.UIDValidity, &f.Unread)
+	err := sc.Scan(&f.ID, &f.AccountID, &f.Path, &f.Name, &role, &f.UIDValidity, &f.FloorUID, &f.Unread)
 	f.Role = mail.FolderRole(role)
 	return f, err
 }
@@ -206,12 +208,13 @@ func (s *Store) FolderByRole(accountID string, role mail.FolderRole) (FolderRow,
 // MessageRow is a stored message.
 type MessageRow struct {
 	mail.MessageSummary
-	UID         uint32
-	MessageID   string
-	Size        int64
-	BodyHTML    string
-	BodyText    string
-	BodyFetched bool
+	UID          uint32
+	MessageID    string
+	Size         int64
+	BodyHTML     string
+	BodyText     string
+	BodyFetched  bool
+	PartsIndexed bool
 }
 
 func MessageID(folderID string, uid uint32) string { return fmt.Sprintf("%s|%d", folderID, uid) }
@@ -219,23 +222,82 @@ func MessageID(folderID string, uid uint32) string { return fmt.Sprintf("%s|%d",
 // UpsertMessage inserts a message or refreshes its envelope and flags,
 // keeping any body already downloaded.
 func (s *Store) UpsertMessage(m MessageRow) error {
-	to, _ := json.Marshal(m.To)
+	to, _ := json.Marshal(nonNil(m.To))
+	cc, _ := json.Marshal(nonNil(m.Cc))
 	_, err := s.db.Exec(`INSERT INTO messages
-		(id, account_id, folder_id, uid, message_id, from_name, from_email, to_json, subject, snippet, date, size,
+		(id, account_id, folder_id, uid, message_id, from_name, from_email, to_json, cc_json, subject, snippet, date, size,
 		 unread, starred, has_attachments, body_html, body_text, body_fetched)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET unread=excluded.unread, starred=excluded.starred,
-			subject=excluded.subject, from_name=excluded.from_name, from_email=excluded.from_email`,
-		m.ID, m.AccountID, m.FolderID, m.UID, m.MessageID, m.From.Name, m.From.Email, string(to), m.Subject, m.Snippet,
+			subject=excluded.subject, from_name=excluded.from_name, from_email=excluded.from_email, cc_json=excluded.cc_json`,
+		m.ID, m.AccountID, m.FolderID, m.UID, m.MessageID, m.From.Name, m.From.Email, string(to), string(cc), m.Subject, m.Snippet,
 		m.Date.Unix(), m.Size, m.Unread, m.Starred, m.HasAttachments, m.BodyHTML, m.BodyText, m.BodyFetched)
 	return err
 }
 
 // SetBody stores a downloaded, parsed body.
-func (s *Store) SetBody(id, html, text, snippet string, hasAttachments bool) error {
-	_, err := s.db.Exec(`UPDATE messages SET body_html=?, body_text=?, snippet=?, has_attachments=?, body_fetched=1 WHERE id=?`,
-		html, text, snippet, hasAttachments, id)
-	return err
+func (s *Store) SetBody(id, html, text, snippet string, hasAttachments bool, parts []Part) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE messages SET body_html=?, body_text=?, snippet=?, has_attachments=?, body_fetched=1, parts_indexed=1 WHERE id=?`,
+		html, text, snippet, hasAttachments, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM parts WHERE message_id = ?`, id); err != nil {
+		return err
+	}
+	for _, p := range parts {
+		if _, err := tx.Exec(`INSERT INTO parts (message_id, idx, filename, content_type, size, content_id, inline, data) VALUES (?,?,?,?,?,?,?,?)`,
+			id, p.Index, p.Filename, p.ContentType, p.Size, p.ContentID, p.Inline, p.Data); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// Part is a stored attachment or inline image (Data only for small inline images).
+type Part struct {
+	mail.Attachment
+	Data []byte
+}
+
+// ListParts returns a message's attachments and inline images (without data).
+func (s *Store) ListParts(messageID string) ([]mail.Attachment, error) {
+	rows, err := s.db.Query(`SELECT idx, filename, content_type, size, content_id, inline FROM parts WHERE message_id = ? ORDER BY idx`, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []mail.Attachment{}
+	for rows.Next() {
+		var a mail.Attachment
+		if err := rows.Scan(&a.Index, &a.Filename, &a.ContentType, &a.Size, &a.ContentID, &a.Inline); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// InlineImages returns content-id -> (content type, data) for a message's stored inline images.
+func (s *Store) InlineImages(messageID string) (map[string]Part, error) {
+	rows, err := s.db.Query(`SELECT idx, content_type, content_id, data FROM parts WHERE message_id = ? AND inline = 1 AND data IS NOT NULL`, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]Part{}
+	for rows.Next() {
+		var p Part
+		if err := rows.Scan(&p.Index, &p.ContentType, &p.ContentID, &p.Data); err != nil {
+			return nil, err
+		}
+		out[p.ContentID] = p
+	}
+	return out, rows.Err()
 }
 
 // SetFlags updates the unread and/or starred flags. Nil leaves a flag unchanged.
@@ -296,21 +358,22 @@ func (s *Store) MissingBodies(folderID string, maxSize int64, limit int) ([]Mess
 	return scanMessages(rows)
 }
 
-const msgCols = `id, account_id, folder_id, uid, message_id, from_name, from_email, to_json, subject, snippet, date, size,
-	unread, starred, has_attachments, body_html, body_text, body_fetched`
+const msgCols = `id, account_id, folder_id, uid, message_id, from_name, from_email, to_json, cc_json, subject, snippet, date, size,
+	unread, starred, has_attachments, body_html, body_text, body_fetched, parts_indexed`
 
 func scanMessage(sc interface{ Scan(...any) error }) (MessageRow, error) {
 	var m MessageRow
-	var to string
+	var to, cc string
 	var date int64
-	err := sc.Scan(&m.ID, &m.AccountID, &m.FolderID, &m.UID, &m.MessageID, &m.From.Name, &m.From.Email, &to,
+	err := sc.Scan(&m.ID, &m.AccountID, &m.FolderID, &m.UID, &m.MessageID, &m.From.Name, &m.From.Email, &to, &cc,
 		&m.Subject, &m.Snippet, &date, &m.Size, &m.Unread, &m.Starred, &m.HasAttachments, &m.BodyHTML, &m.BodyText,
-		&m.BodyFetched)
+		&m.BodyFetched, &m.PartsIndexed)
 	if err != nil {
 		return m, err
 	}
 	m.Date = time.Unix(date, 0)
 	_ = json.Unmarshal([]byte(to), &m.To)
+	_ = json.Unmarshal([]byte(cc), &m.Cc)
 	return m, nil
 }
 
@@ -385,4 +448,79 @@ func ftsQuery(q string) string {
 		terms = append(terms, `"`+w+`"*`)
 	}
 	return strings.Join(terms, " ")
+}
+
+func nonNil(a []mail.Address) []mail.Address {
+	if a == nil {
+		return []mail.Address{}
+	}
+	return a
+}
+
+// SuggestContacts returns people whose name or address starts with prefix
+// (or a word in their name does), most frequent correspondents first.
+func (s *Store) SuggestContacts(prefix string, limit int) ([]mail.Address, error) {
+	p := strings.ToLower(strings.TrimSpace(prefix))
+	if p == "" {
+		return []mail.Address{}, nil
+	}
+	esc := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(p)
+	rows, err := s.db.Query(`SELECT from_name, from_email FROM messages
+		WHERE from_email <> '' AND (lower(from_email) LIKE ? ESCAPE '\' OR lower(from_name) LIKE ? ESCAPE '\' OR lower(from_name) LIKE ? ESCAPE '\')
+		GROUP BY lower(from_email) ORDER BY count(*) DESC, max(date) DESC LIMIT ?`,
+		esc+"%", esc+"%", "% "+esc+"%", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []mail.Address{}
+	for rows.Next() {
+		var a mail.Address
+		if err := rows.Scan(&a.Name, &a.Email); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// SetFolderFloor records how far back a folder's continuous history goes.
+func (s *Store) SetFolderFloor(folderID string, uid uint32) error {
+	_, err := s.db.Exec(`UPDATE folders SET floor_uid = ? WHERE id = ?`, uid, folderID)
+	return err
+}
+
+// ListFolderMessages returns one folder's messages, newest first, optionally
+// filtered by a full-text query.
+func (s *Store) ListFolderMessages(folderID, query string, limit int) ([]mail.MessageSummary, error) {
+	where := []string{"m.folder_id = ?"}
+	args := []any{folderID}
+	from := "messages m"
+	if fts := ftsQuery(query); fts != "" {
+		from += " JOIN messages_fts ON messages_fts.rowid = m.rowid"
+		where = append(where, "messages_fts MATCH ?")
+		args = append(args, fts)
+	}
+	args = append(args, limit)
+	rows, err := s.db.Query(`SELECT m.id, m.account_id, m.folder_id, m.from_name, m.from_email, m.to_json, m.subject,
+		m.snippet, m.date, m.unread, m.starred, m.has_attachments
+		FROM `+from+` WHERE `+strings.Join(where, " AND ")+` ORDER BY m.date DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []mail.MessageSummary{}
+	for rows.Next() {
+		var m mail.MessageSummary
+		var to string
+		var date int64
+		if err := rows.Scan(&m.ID, &m.AccountID, &m.FolderID, &m.From.Name, &m.From.Email, &to, &m.Subject,
+			&m.Snippet, &date, &m.Unread, &m.Starred, &m.HasAttachments); err != nil {
+			return nil, err
+		}
+		m.Date = time.Unix(date, 0)
+		_ = json.Unmarshal([]byte(to), &m.To)
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }

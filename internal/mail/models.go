@@ -48,7 +48,9 @@ type Folder struct {
 	AccountID string     `json:"accountId"`
 	Name      string     `json:"name"`
 	Role      FolderRole `json:"role"`
-	Unread    int        `json:"unread"`
+	// Path is the server path, e.g. "Work/Projects" (used to show nesting).
+	Path   string `json:"path"`
+	Unread int    `json:"unread"`
 }
 
 // Address is an email participant.
@@ -64,6 +66,7 @@ type MessageSummary struct {
 	FolderID       string    `json:"folderId"`
 	From           Address   `json:"from"`
 	To             []Address `json:"to"`
+	Cc             []Address `json:"cc"`
 	Subject        string    `json:"subject"`
 	Snippet        string    `json:"snippet"`
 	Date           time.Time `json:"date"`
@@ -72,10 +75,21 @@ type MessageSummary struct {
 	HasAttachments bool      `json:"hasAttachments"`
 }
 
+// Attachment describes a file attached to a message (data is fetched on demand).
+type Attachment struct {
+	Index       int    `json:"index"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"contentType"`
+	Size        int64  `json:"size"`
+	ContentID   string `json:"-"`
+	Inline      bool   `json:"inline"`
+}
+
 // MessageBody is a message's content, already sanitized for display.
 type MessageBody struct {
-	ID           string `json:"id"`
-	HTML         string `json:"html"`
-	Text         string `json:"text"`
-	RemoteImages int    `json:"remoteImages"`
+	ID           string       `json:"id"`
+	HTML         string       `json:"html"`
+	Text         string       `json:"text"`
+	RemoteImages int          `json:"remoteImages"`
+	Attachments  []Attachment `json:"attachments"`
 }

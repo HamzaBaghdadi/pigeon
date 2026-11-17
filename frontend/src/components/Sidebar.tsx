@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import {
   Archive,
+  ChevronRight,
+  Folder as FolderIcon,
   File,
   Inbox,
   Layers,
@@ -16,7 +19,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import type { Account, Folder, FolderRole, SyncStatus } from "@/lib/api";
+import { api, type Account, type Folder, type FolderRole, type SyncStatus, type UpdateStatus } from "@/lib/api";
 import type { Section } from "./SettingsDialog";
 
 const folderItems: { role: string; label: string; icon: LucideIcon; count?: boolean }[] = [
@@ -36,14 +39,25 @@ type Props = {
   role: FolderRole;
   onSelectAccount: (id: string) => void;
   onSelectRole: (role: FolderRole) => void;
+  folderId: string;
+  onSelectFolder: (f: Folder) => void;
   onOpenSettings: (section?: Section) => void;
   onAddAccount: () => void;
   onSyncNow: () => void;
+  onCompose: () => void;
   sync: SyncStatus | null;
+  update: UpdateStatus | null;
+  onInstallUpdate: () => void;
 };
 
 export default function Sidebar(props: Props) {
   const { accounts, folders, accountId, role, onSelectAccount, onSelectRole, onOpenSettings } = props;
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // The user's own folders and labels (Gmail's system views are hidden).
+  const ownFolders = (acct: string) =>
+    folders
+      .filter((f) => f.accountId === acct && f.role === "custom" && !f.path.startsWith("[Gmail]"))
+      .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: "base" }));
   const unread = (r: string, acct: string) =>
     folders
       .filter((f) => f.role === r && (acct === "" || f.accountId === acct))
@@ -60,6 +74,7 @@ export default function Sidebar(props: Props) {
       <div className="px-3 pb-3">
         <button
           title="Compose (C)"
+          onClick={props.onCompose}
           className="flex h-8 w-full items-center gap-2 rounded-md bg-primary px-3 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-primary-hover active:translate-y-px"
         >
           <PenSquare size={15} strokeWidth={2} aria-hidden />
@@ -71,7 +86,7 @@ export default function Sidebar(props: Props) {
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Mailboxes">
         <ul>
           {folderItems.map(({ role: r, label, icon: Icon, count }) => {
-            const active = role === r;
+            const active = role === r && !props.folderId;
             const n = count ? unread(r, accountId) : 0;
             return (
               <li key={r}>
@@ -103,17 +118,32 @@ export default function Sidebar(props: Props) {
             count={unread("inbox", "")}
             onClick={() => onSelectAccount("")}
           />
-          {accounts.map((a) => (
-            <AccountRow
-              key={a.id}
-              active={accountId === a.id}
-              label={a.name}
-              sub={a.email}
-              color={a.color}
-              count={unread("inbox", a.id)}
-              onClick={() => onSelectAccount(a.id)}
-            />
-          ))}
+          {accounts.map((a) => {
+            const own = ownFolders(a.id);
+            const open = expanded[a.id] ?? (accountId === a.id && own.length > 0);
+            return (
+              <AccountRow
+                key={a.id}
+                active={accountId === a.id && !props.folderId}
+                label={a.name}
+                sub={a.email}
+                color={a.color}
+                count={unread("inbox", a.id)}
+                onClick={() => onSelectAccount(a.id)}
+                expandable={own.length > 0}
+                expanded={open}
+                onToggle={() => setExpanded((e) => ({ ...e, [a.id]: !open }))}
+              >
+                {open && own.length > 0 && (
+                  <ul aria-label={`${a.name} folders`}>
+                    {own.map((f) => (
+                      <FolderRow key={f.id} folder={f} active={props.folderId === f.id} onClick={() => props.onSelectFolder(f)} />
+                    ))}
+                  </ul>
+                )}
+              </AccountRow>
+            );
+          })}
           <li>
             <button
               onClick={props.onAddAccount}
@@ -126,6 +156,7 @@ export default function Sidebar(props: Props) {
         </ul>
       </nav>
 
+      <UpdateBanner update={props.update} onInstall={props.onInstallUpdate} onDetails={() => onOpenSettings("about")} />
       <div className="flex h-11 shrink-0 items-center gap-1 border-t border-border pr-2.5 pl-4 text-[12px] text-subtle">
         <SyncLine sync={props.sync} accounts={accounts} onShowErrors={() => onOpenSettings("accounts")} />
         {accounts.some((a) => !a.demo) && (
@@ -159,9 +190,23 @@ function AccountRow(props: {
   color?: string;
   count: number;
   onClick: () => void;
+  expandable?: boolean;
+  expanded?: boolean;
+  onToggle?: () => void;
+  children?: React.ReactNode;
 }) {
   return (
-    <li>
+    <li className="relative">
+      {props.expandable && (
+        <button
+          onClick={props.onToggle}
+          aria-label={`${props.expanded ? "Hide" : "Show"} ${props.label} folders`}
+          aria-expanded={props.expanded}
+          className="absolute top-[7px] left-0 z-10 rounded p-0.5 text-subtle transition-colors hover:text-text"
+        >
+          <ChevronRight size={12} strokeWidth={2} className={`transition-transform duration-150 ${props.expanded ? "rotate-90" : ""}`} />
+        </button>
+      )}
       <button
         onClick={props.onClick}
         title={props.sub}
@@ -179,6 +224,28 @@ function AccountRow(props: {
         </span>
         <span className="flex-1 truncate text-left">{props.label}</span>
         {props.count > 0 && <span className="text-[12px] text-subtle tabular-nums">{props.count}</span>}
+      </button>
+      {props.children}
+    </li>
+  );
+}
+
+function FolderRow({ folder, active, onClick }: { folder: Folder; active: boolean; onClick: () => void }) {
+  const depth = folder.path.split("/").length - 1;
+  return (
+    <li>
+      <button
+        onClick={onClick}
+        title={folder.path}
+        aria-current={active ? "page" : undefined}
+        style={{ paddingLeft: 30 + depth * 14 }}
+        className={`flex h-[28px] w-full items-center gap-2 rounded-md pr-2.5 text-[12.5px] transition-colors duration-150 ${
+          active ? "bg-active font-medium text-text" : "text-muted hover:bg-hover hover:text-text"
+        }`}
+      >
+        <FolderIcon size={13} strokeWidth={1.75} className={active ? "text-primary" : ""} aria-hidden />
+        <span className="flex-1 truncate text-left">{folder.name}</span>
+        {folder.unread > 0 && <span className="text-[11.5px] text-subtle tabular-nums">{folder.unread}</span>}
       </button>
     </li>
   );
@@ -220,4 +287,35 @@ function ago(iso: string): string {
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function UpdateBanner({ update, onInstall, onDetails }: { update: UpdateStatus | null; onInstall: () => void; onDetails: () => void }) {
+  if (!update || (update.state !== "ready" && update.state !== "available")) return null;
+  const ready = update.state === "ready";
+  return (
+    <div className="mx-2 mb-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-[12.5px]" role="status">
+      <div className="font-medium">{ready ? "Update ready" : "Update available"}</div>
+      <div className="mt-0.5 text-[12px] text-subtle">Pigeon {update.latest}</div>
+      <div className="mt-2 flex gap-1.5">
+        {ready ? (
+          <button
+            onClick={onInstall}
+            className="h-7 flex-1 rounded-md bg-primary text-[12.5px] font-medium text-white transition-colors hover:bg-primary-hover"
+          >
+            Restart to update
+          </button>
+        ) : (
+          <button
+            onClick={() => api.openExternal(update.url)}
+            className="h-7 flex-1 rounded-md bg-primary text-[12.5px] font-medium text-white transition-colors hover:bg-primary-hover"
+          >
+            Download
+          </button>
+        )}
+        <button onClick={onDetails} className="h-7 rounded-md px-2 text-[12.5px] text-muted transition-colors hover:bg-hover hover:text-text">
+          Details
+        </button>
+      </div>
+    </div>
+  );
 }

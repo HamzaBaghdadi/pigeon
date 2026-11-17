@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/HamzaBaghdadi/pigeon/internal/settings"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -86,4 +87,23 @@ func BackgroundFor(dark bool) application.RGBA {
 		return application.NewRGB(0x13, 0x14, 0x17)
 	}
 	return application.NewRGB(0xf7, 0xf7, 0xf8)
+}
+
+// SetDisplayName sets the name recipients see on mail you send.
+func (s *SettingsService) SetDisplayName(name string) (settings.Settings, error) {
+	name = strings.Join(strings.Fields(name), " ")
+	if len(name) > 100 {
+		return s.store.Get(), errors.New("that name is too long")
+	}
+	return s.store.Update(func(v *settings.Settings) { v.DisplayName = name })
+}
+
+// SetNotifications turns new-mail notifications on or off.
+func (s *SettingsService) SetNotifications(on bool) (settings.Settings, error) {
+	return s.store.Update(func(v *settings.Settings) { v.DisableNotifications = !on })
+}
+
+// SetCloseToTray chooses whether closing the window keeps Pigeon running in the tray.
+func (s *SettingsService) SetCloseToTray(on bool) (settings.Settings, error) {
+	return s.store.Update(func(v *settings.Settings) { v.DisableCloseToTray = !on })
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Archive, Paperclip, Search, Star, Trash2, X } from "lucide-react";
+import { Archive, Loader2, Paperclip, Search, Star, Trash2, X } from "lucide-react";
 import type { Account, FolderRole, MessageSummary } from "@/lib/api";
 import { shortDate } from "@/lib/format";
 
@@ -29,6 +29,14 @@ type Props = {
   onToggleStar: (m: MessageSummary) => void;
   onArchive: (m: MessageSummary) => void;
   onTrash: (m: MessageSummary) => void;
+  folderName?: string;
+  canLoadOlder: boolean;
+  olderLoading: boolean;
+  olderDone: boolean;
+  onLoadOlder: () => void;
+  serverSearchBusy: boolean;
+  serverSearchMatched: number | null;
+  onSearchServer: () => void;
 };
 
 export default function MessageList({ searchRef, ...p }: Props) {
@@ -76,23 +84,32 @@ export default function MessageList({ searchRef, ...p }: Props) {
       </div>
 
       <div className="flex h-9 shrink-0 items-baseline gap-2 border-b border-border px-4">
-        <h1 className="text-[15px] font-semibold tracking-[-0.01em]">{roleTitle[p.role] ?? p.role}</h1>
+        <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{p.folderName ?? roleTitle[p.role] ?? p.role}</h1>
         <span className="truncate text-[12px] text-subtle">
           {p.accountName}
           {unreadCount > 0 && ` · ${unreadCount} unread`}
         </span>
       </div>
 
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onScroll={(e) => {
+          // Keep scrolling to load older mail (not while searching).
+          const el = e.currentTarget;
+          if (!p.query && p.canLoadOlder && !p.olderDone && el.scrollHeight - el.scrollTop - el.clientHeight < 400) p.onLoadOlder();
+        }}
+      >
       {p.messages.length === 0 ? (
         <EmptyState searching={p.query !== ""} />
       ) : (
-        <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto" role="listbox" aria-label="Messages">
+        <ul ref={listRef} role="listbox" aria-label="Messages">
           {p.messages.map((m) => (
             <Row
               key={m.id}
               m={m}
               selected={m.id === p.selectedId}
               account={p.showAccount ? p.accountsById.get(m.accountId) : undefined}
+              outgoing={p.role === "sent" || p.role === "drafts"}
               onSelect={() => p.onSelect(m)}
               onToggleStar={() => p.onToggleStar(m)}
               onArchive={() => p.onArchive(m)}
@@ -101,6 +118,8 @@ export default function MessageList({ searchRef, ...p }: Props) {
           ))}
         </ul>
       )}
+      {p.canLoadOlder && <ListFooter {...p} empty={p.messages.length === 0} />}
+      </div>
     </section>
   );
 }
@@ -109,6 +128,7 @@ function Row(props: {
   m: MessageSummary;
   selected: boolean;
   account?: Account;
+  outgoing?: boolean;
   onSelect: () => void;
   onToggleStar: () => void;
   onArchive: () => void;
@@ -138,7 +158,7 @@ function Row(props: {
 
       <div className="flex items-center gap-2">
         <span className={`min-w-0 flex-1 truncate text-[13.5px] ${m.unread ? "font-semibold text-text" : "text-text"}`}>
-          {m.from.name || m.from.email}
+          {props.outgoing ? `To: ${(m.to ?? []).map((t) => t.name || t.email).join(", ") || "(no recipients)"}` : m.from.name || m.from.email}
         </span>
         <span className="flex shrink-0 items-center gap-1.5 group-hover:invisible">
           {m.hasAttachments && <Paperclip size={12} className="text-subtle" aria-label="Has attachments" />}
@@ -188,11 +208,57 @@ function QuickAction(props: { label: string; icon: React.ReactNode; active?: boo
 
 function EmptyState({ searching }: { searching: boolean }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+    <div className="flex flex-col items-center justify-center px-8 pt-16 pb-6 text-center">
       <p className="text-[13.5px] font-medium">{searching ? "No results" : "Nothing here"}</p>
       <p className="mt-1 max-w-[240px] text-[12.5px] text-subtle">
         {searching ? "Try a sender name, subject or keyword." : "New mail will show up here."}
       </p>
+    </div>
+  );
+}
+
+function ListFooter(p: Omit<Props, "searchRef"> & { empty: boolean }) {
+  const base = "flex items-center justify-center gap-2 px-4 py-4 text-[12.5px] text-subtle";
+  const button = "rounded-md px-3 py-1.5 font-medium text-primary transition-colors hover:bg-primary-soft";
+  if (p.query.trim()) {
+    if (p.serverSearchBusy)
+      return (
+        <div className={base} role="status">
+          <Loader2 size={13} className="animate-spin" aria-hidden />
+          Searching all mail on the server…
+        </div>
+      );
+    if (p.serverSearchMatched !== null)
+      return (
+        <div className={base} role="status">
+          {p.serverSearchMatched === 0
+            ? "No other matches on the server."
+            : `${p.serverSearchMatched} ${p.serverSearchMatched === 1 ? "match" : "matches"} on the server. The newest are shown above.`}
+        </div>
+      );
+    return (
+      <div className={base}>
+        {p.empty ? "Not in downloaded mail." : "Looking for something older?"}
+        <button onClick={p.onSearchServer} className={button}>
+          Search all mail on the server
+        </button>
+      </div>
+    );
+  }
+  if (p.empty) return null;
+  if (p.olderLoading)
+    return (
+      <div className={base} role="status">
+        <Loader2 size={13} className="animate-spin" aria-hidden />
+        Loading older messages…
+      </div>
+    );
+  if (p.olderDone) return <div className={base}>That&apos;s everything in this folder.</div>;
+  return (
+    <div className={base}>
+      <button onClick={p.onLoadOlder} className={button}>
+        Load older messages
+      </button>
     </div>
   );
 }

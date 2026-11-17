@@ -16,6 +16,7 @@ frontend/tsconfig.tsbuildinfo
 
 # Secrets must never be committed
 services/release_credentials.go
+internal/version/release_version.go
 .env
 .env.*
 *.pfx

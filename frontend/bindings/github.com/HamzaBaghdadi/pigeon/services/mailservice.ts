@@ -35,6 +35,14 @@ export function ListAccounts(): $CancellablePromise<mail$0.Account[] | null> {
 }
 
 /**
+ * ListFolderMessages returns a single folder's messages, newest first.
+ * query runs a full-text search within the folder.
+ */
+export function ListFolderMessages(folderID: string, query: string): $CancellablePromise<mail$0.MessageSummary[] | null> {
+    return $Call.ByID(597196923, folderID, query);
+}
+
+/**
  * ListFolders returns the folders of one account, or of all accounts if accountID is empty.
  */
 export function ListFolders(accountID: string): $CancellablePromise<mail$0.Folder[] | null> {
@@ -50,10 +58,33 @@ export function ListMessages(accountID: string, role: mail$0.FolderRole, query: 
 }
 
 /**
+ * LoadOlder downloads the next batch of older mail for a view: one folder
+ * (folderID), or a folder role across one or all accounts.
+ */
+export function LoadOlder(accountID: string, role: mail$0.FolderRole, folderID: string): $CancellablePromise<$models.HistoryResult> {
+    return $Call.ByID(3466075039, accountID, role, folderID);
+}
+
+/**
  * Move moves a message to the account's folder with the given role.
  */
 export function Move(id: string, role: mail$0.FolderRole): $CancellablePromise<$models.MoveResult> {
     return $Call.ByID(2343156486, id, role);
+}
+
+/**
+ * MoveToFolder moves a message to a specific folder of its account.
+ */
+export function MoveToFolder(id: string, folderID: string): $CancellablePromise<$models.MoveResult> {
+    return $Call.ByID(2585195391, id, folderID);
+}
+
+/**
+ * OpenAttachment opens an attachment with its default app. Files that could
+ * run code are refused; save and scan those instead.
+ */
+export function OpenAttachment(messageID: string, index: number): $CancellablePromise<void> {
+    return $Call.ByID(2938428638, messageID, index);
 }
 
 /**
@@ -62,6 +93,30 @@ export function Move(id: string, role: mail$0.FolderRole): $CancellablePromise<$
  */
 export function OpenExternal(link: string): $CancellablePromise<void> {
     return $Call.ByID(69193840, link);
+}
+
+/**
+ * OpenFolder syncs a folder that background sync doesn't cover (your own
+ * folders and labels) so it's up to date when you open it.
+ */
+export function OpenFolder(folderID: string): $CancellablePromise<void> {
+    return $Call.ByID(1770849879, folderID);
+}
+
+/**
+ * SaveAttachment asks where to save an attachment and writes it there.
+ * It returns the saved path ("" if the user cancelled).
+ */
+export function SaveAttachment(messageID: string, index: number): $CancellablePromise<string> {
+    return $Call.ByID(2808280167, messageID, index);
+}
+
+/**
+ * SearchServer searches all mail on the server (not just what's downloaded)
+ * for a view and downloads the newest matches.
+ */
+export function SearchServer(accountID: string, role: mail$0.FolderRole, folderID: string, query: string): $CancellablePromise<$models.HistoryResult> {
+    return $Call.ByID(522397940, accountID, role, folderID, query);
 }
 
 /**
@@ -76,4 +131,11 @@ export function SetRead(id: string, read: boolean): $CancellablePromise<void> {
  */
 export function SetStarred(id: string, starred: boolean): $CancellablePromise<void> {
     return $Call.ByID(1097632288, id, starred);
+}
+
+/**
+ * ShowInFolder reveals a file Pigeon saved in the system file manager.
+ */
+export function ShowInFolder(path: string): $CancellablePromise<void> {
+    return $Call.ByID(2135064997, path);
 }

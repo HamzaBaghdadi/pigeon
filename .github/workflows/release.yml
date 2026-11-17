@@ -38,12 +38,21 @@ jobs:
           mkdir -p frontend/dist && echo ok > frontend/dist/index.html  # placeholder; the real UI is built below
           go test ./...
 
+      - name: Updates must be verifiable
+        shell: bash
+        run: |
+          if grep -q 'const PublicKey = ""' internal/updater/pubkey.go; then
+            echo "::error::No update public key. Run go run ./scripts/update-keys and commit internal/updater/pubkey.go (see docs/releasing.md)."
+            exit 1
+          fi
+
       # The Google OAuth client comes from repository secrets and is written to a
       # gitignored file just for this build. It is never committed or printed.
       - name: Embed Sign in with Google client
         env:
           PIGEON_GOOGLE_CLIENT_ID: ${{ secrets.PIGEON_GOOGLE_CLIENT_ID }}
           PIGEON_GOOGLE_CLIENT_SECRET: ${{ secrets.PIGEON_GOOGLE_CLIENT_SECRET }}
+          PIGEON_VERSION: ${{ github.ref_name }}
         run: go run ./scripts/embed-credentials
 
       - name: Build installer
@@ -60,9 +69,16 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item bin/pigeon-amd64-installer.exe "dist/Pigeon-$tag-windows-setup.exe"
           Compress-Archive -Path bin/pigeon.exe -DestinationPath "dist/Pigeon-$tag-windows-portable.zip"
-          Get-ChildItem dist | Get-FileHash -Algorithm SHA256 |
+          Get-ChildItem dist/*.exe, dist/*.zip | Get-FileHash -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
             Out-File dist/SHA256SUMS.txt -Encoding ascii
+
+      # Installed copies only accept updates whose checksum list is signed with
+      # this key (its public half is compiled into the app).
+      - name: Sign checksums for auto-update
+        env:
+          PIGEON_UPDATE_SIGNING_KEY: ${{ secrets.PIGEON_UPDATE_SIGNING_KEY }}
+        run: go run ./scripts/sign-release dist/SHA256SUMS.txt
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2

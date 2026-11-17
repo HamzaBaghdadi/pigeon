@@ -11,7 +11,7 @@
 
 ---
 
-> **Status: early development.** Reading mail works: link IMAP accounts (Gmail, iCloud, Yahoo, Fastmail and others), sync, search, archive, delete. Gmail works with Sign in with Google (no app password needed). Sending and Microsoft sign-in are next.
+> **Status: early development.** Reading and sending mail work: link IMAP accounts (Gmail, iCloud, Yahoo, Fastmail and others), sync, search, archive, delete, compose, reply and forward. Gmail works with Sign in with Google (no app password needed). Sending and Microsoft sign-in are next.
 
 ## Why Pigeon
 
@@ -19,10 +19,13 @@
 - **Private by default.** Remote images (tracking pixels) are blocked until you allow them. No telemetry.
 - **Secure email rendering.** Every email is sanitized in Go and then rendered in a sandboxed, script-free iframe with its own strict Content Security Policy.
 - **Secrets stay in your OS keychain.** Passwords and OAuth tokens go to Windows Credential Manager, macOS Keychain or Secret Service, never to Pigeon's own files.
-- **Keyboard-first.** `J`/`K` to move, `E` to archive, `S` to star, `U` to toggle read, `Z` to undo, `/` or `Ctrl+K` to search, `Ctrl+,` for settings.
+- **Keyboard-first.** `J`/`K` to move, `E` to archive, `S` to star, `U` to toggle read, `C` to compose, `R`/`A`/`F` to reply/reply all/forward, `Ctrl+Enter` to send, `Z` to undo, `/` or `Ctrl+K` to search, `Ctrl+,` for settings.
 - **Light and dark.** Follows your system theme by default, or pick Light or Dark in Settings. Pane widths are adjustable and remembered.
 - **Fast and offline.** Mail is cached in a local SQLite database with full-text search, so the inbox opens instantly and search works without a connection.
 - **Small.** Native webview instead of a bundled browser.
+- **Careful with attachments.** Saved files are tagged as downloaded from the internet (Mark of the Web) so Windows SmartScreen checks them, and file types that can run code are never opened directly.
+- **Never miss mail.** New messages arrive within seconds and show a notification; Pigeon keeps running in the tray when you close the window.
+- **Safe auto-updates.** New versions download in the background and install on restart, only if they carry the project's signature.
 
 ## Platforms
 
@@ -75,6 +78,8 @@ internal/mail/          Core email types
 internal/store/         Local SQLite mail database with full-text search
 internal/imapsync/      IMAP sync engine (folders, messages, flags, moves)
 internal/mailparse/     MIME parsing (charsets, multipart, attachments)
+internal/compose/       Building outgoing messages (threading, attachments)
+internal/smtpsend/      Sending over SMTP (password or OAuth)
 internal/providers/     Server settings for common providers
 internal/oauth/         Sign in with Google (browser flow, PKCE, token refresh)
 internal/settings/      User preferences (theme)
@@ -102,13 +107,17 @@ Pigeon's palette comes from its logo:
 ## Roadmap
 
 - [x] IMAP sync into a local SQLite store with full-text search
-- [ ] Instant new-mail push (IMAP IDLE) and older-mail paging
-- [ ] SMTP sending and a composer
+- [x] Instant new mail (IMAP IDLE push, with polling fallback)
+- [x] Full history: load older mail by scrolling, search all mail on the server
+- [x] Composer: new, reply, reply all, forward, attachments, contact suggestions, undo send
+- [ ] Drafts saved to the server, rich text formatting
 - [x] Sign in with Google (OAuth 2.0 + PKCE, XOAUTH2). [Setup guide](docs/google-sign-in.md)
 - [ ] Sign in with Microsoft (Outlook.com, Microsoft 365)
 - [x] Unified inbox actions: archive, delete, star, read/unread, undo
-- [ ] Move to any folder, snooze
-- [ ] Notifications and system tray
+- [x] All your folders and labels; move to any folder (M)
+- [x] Attachments: open, save, forward; embedded images shown
+- [ ] Snooze
+- [x] New-mail notifications, system tray, single instance
 - [ ] Encrypted local cache
 - [ ] OpenPGP / S/MIME
 - [ ] macOS and Linux builds

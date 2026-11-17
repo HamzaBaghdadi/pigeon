@@ -32,6 +32,17 @@ type Settings struct {
 	// GoogleClientID is the user's own Google OAuth client (see docs/google-sign-in.md).
 	// Its secret is kept in the OS keychain, not here.
 	GoogleClientID string `json:"googleClientId,omitempty"`
+	// DisableAutoUpdate turns off background update checks (on by default).
+	DisableAutoUpdate bool `json:"disableAutoUpdate,omitempty"`
+	// DisplayName is the name recipients see on mail you send.
+	DisplayName string `json:"displayName,omitempty"`
+	// DisableNotifications turns off new-mail notifications (on by default).
+	DisableNotifications bool `json:"disableNotifications,omitempty"`
+	// DisableCloseToTray makes closing the window quit Pigeon instead of
+	// keeping it running in the system tray (tray is the default).
+	DisableCloseToTray bool `json:"disableCloseToTray,omitempty"`
+	// TrayHintShown records that the "still running in the tray" tip was shown.
+	TrayHintShown bool `json:"trayHintShown,omitempty"`
 }
 
 func defaults() Settings {
@@ -74,6 +85,11 @@ func OpenAt(path string) (*Store, error) {
 		s.cur.Theme = loaded.Theme
 	}
 	s.cur.GoogleClientID = loaded.GoogleClientID
+	s.cur.DisableAutoUpdate = loaded.DisableAutoUpdate
+	s.cur.DisplayName = loaded.DisplayName
+	s.cur.DisableNotifications = loaded.DisableNotifications
+	s.cur.DisableCloseToTray = loaded.DisableCloseToTray
+	s.cur.TrayHintShown = loaded.TrayHintShown
 	return s, nil
 }
 

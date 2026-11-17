@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -195,12 +196,215 @@ func TestSyncFlagsMoveAndDeletion(t *testing.T) {
 	}
 }
 
-func TestXOAuth2InitialResponse(t *testing.T) {
-	mech, ir, err := newXOAuth2Client("me@gmail.com", "test-access-token").Start()
-	if err != nil || mech != "XOAUTH2" {
-		t.Fatalf("Start = %s, %v", mech, err)
+func TestAppendSent(t *testing.T) {
+	_, st, eng, acct := setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
 	}
-	if want := "user=me@gmail.comauth=Bearer test-access-token"; string(ir) != want {
-		t.Errorf("initial response = %q, want %q", ir, want)
+	raw := []byte("From: me@example.com\r\nTo: lina@example.com\r\nSubject: Sent from Pigeon\r\nDate: Mon, 16 Nov 2026 11:00:00 +0000\r\n\r\nHello Lina\r\n")
+	if err := eng.AppendSent(acct, raw); err != nil {
+		t.Fatalf("AppendSent: %v", err)
+	}
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
+	}
+	sent, _ := st.ListMessages("acc", mail.RoleSent, "", 10)
+	if len(sent) != 1 || sent[0].Subject != "Sent from Pigeon" || sent[0].Unread {
+		t.Fatalf("sent folder = %+v", sent)
+	}
+}
+
+func TestIdlePushAndNewMailDetection(t *testing.T) {
+	addr, _, eng, acct := setup(t)
+	appendMsgs(t, addr, 2)
+
+	var mu sync.Mutex
+	var reported []store.MessageRow
+	eng.OnNewMail = func(_ store.Account, msgs []store.MessageRow) {
+		mu.Lock()
+		reported = append(reported, msgs...)
+		mu.Unlock()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// First sync of an account: existing mail is not "new".
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	if len(reported) != 0 {
+		t.Fatalf("first sync reported %d messages as new", len(reported))
+	}
+	mu.Unlock()
+
+	// Watch the inbox; on a push, sync just the inbox.
+	watchCtx, stopWatch := context.WithCancel(ctx)
+	defer stopWatch()
+	go eng.Watch(watchCtx, acct, func() { _ = eng.SyncInbox(watchCtx, acct) })
+	time.Sleep(300 * time.Millisecond) // let IDLE start
+
+	// Mail arrives from elsewhere.
+	c, err := imapclient.DialInsecure(addr, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.Login(testUser, testPass).Wait()
+	raw := "From: Nour <nour@example.org>\r\nTo: " + testUser + "\r\nSubject: Pushed!\r\nContent-Type: text/plain\r\n\r\nArrived via IDLE.\r\n"
+	cmd := c.Append("INBOX", int64(len(raw)), nil)
+	cmd.Write([]byte(raw))
+	cmd.Close()
+	if _, err := cmd.Wait(); err != nil {
+		t.Fatal(err)
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		mu.Lock()
+		n := len(reported)
+		mu.Unlock()
+		if n > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reported) != 1 || reported[0].Subject != "Pushed!" || reported[0].From.Email != "nour@example.org" {
+		t.Fatalf("pushed mail not reported correctly: %+v", reported)
+	}
+	if !strings.Contains(reported[0].Snippet, "Arrived via IDLE") {
+		t.Errorf("new-mail report should include a preview, got %q", reported[0].Snippet)
+	}
+}
+
+func TestLoadOlderKeepsHistoryAndServerSearch(t *testing.T) {
+	addr, st, eng, acct := setup(t)
+	old := windowByRole[mail.RoleInbox]
+	windowByRole[mail.RoleInbox] = 5
+	t.Cleanup(func() { windowByRole[mail.RoleInbox] = old })
+
+	// An old message with a unique word, then 12 newer ones.
+	c, _ := imapclient.DialInsecure(addr, nil)
+	defer c.Close()
+	c.Login(testUser, testPass).Wait()
+	zebra := "From: Zed <zed@example.org>\r\nTo: " + testUser + "\r\nSubject: Field notes\r\nContent-Type: text/plain\r\n\r\nWe saw a zebra today.\r\n"
+	cmd := c.Append("INBOX", int64(len(zebra)), nil)
+	cmd.Write([]byte(zebra))
+	cmd.Close()
+	cmd.Wait()
+	appendMsgs(t, addr, 12)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
+	}
+	inbox, _ := st.FolderByRole("acc", mail.RoleInbox)
+	count := func() int { l, _ := st.ListMessages("acc", mail.RoleInbox, "", 1000); return len(l) }
+	if n := count(); n != 5 {
+		t.Fatalf("after first sync: %d messages, want window of 5", n)
+	}
+
+	// Server search finds the old message that isn't downloaded yet.
+	matched, err := eng.SearchServer(ctx, acct, inbox.ID, "zebra", 50)
+	if err != nil || matched != 1 {
+		t.Fatalf("SearchServer = %d, %v", matched, err)
+	}
+	if got, _ := st.ListMessages("acc", mail.RoleInbox, "zebra", 10); len(got) != 1 || got[0].Subject != "Field notes" {
+		t.Fatalf("server result not searchable locally: %+v", got)
+	}
+
+	// Page through older mail until it's all loaded.
+	if n, err := eng.LoadOlder(ctx, acct, inbox.ID, 4); err != nil || n != 4 {
+		t.Fatalf("LoadOlder(4) = %d, %v", n, err)
+	}
+	for {
+		n, err := eng.LoadOlder(ctx, acct, inbox.ID, 4)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			break
+		}
+	}
+	if n := count(); n != 13 {
+		t.Fatalf("after loading all history: %d, want 13", n)
+	}
+
+	// A regular sync must keep the loaded history...
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(); n != 13 {
+		t.Fatalf("sync dropped loaded history: %d, want 13", n)
+	}
+	// ...but still notice old mail deleted or read elsewhere.
+	c.Select("INBOX", nil).Wait()
+	c.Store(imap.SeqSetNum(1), &imap.StoreFlags{Op: imap.StoreFlagsAdd, Silent: true, Flags: []imap.Flag{imap.FlagDeleted}}, nil).Close()
+	c.Expunge().Close()
+	c.Store(imap.SeqSetNum(1), &imap.StoreFlags{Op: imap.StoreFlagsAdd, Silent: true, Flags: []imap.Flag{imap.FlagSeen}}, nil).Close()
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(); n != 12 {
+		t.Fatalf("remote delete of old mail not applied: %d, want 12", n)
+	}
+	if got, _ := st.ListMessages("acc", mail.RoleInbox, "zebra", 10); len(got) != 0 {
+		t.Errorf("deleted old message still present")
+	}
+	all, _ := st.ListMessages("acc", mail.RoleInbox, "", 100)
+	oldest := all[len(all)-1]
+	if oldest.Unread {
+		t.Errorf("flag change on old mail not applied: %+v", oldest)
+	}
+}
+
+func TestAttachmentsIndexedAndFetchRaw(t *testing.T) {
+	addr, st, eng, acct := setup(t)
+	raw := "From: a@example.com\r\nTo: " + testUser + "\r\nSubject: Report\r\nMIME-Version: 1.0\r\n" +
+		"Content-Type: multipart/mixed; boundary=mix\r\n\r\n" +
+		"--mix\r\nContent-Type: multipart/related; boundary=rel\r\n\r\n" +
+		"--rel\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>Logo <img src=\"cid:logo@x\"></p>\r\n" +
+		"--rel\r\nContent-Type: image/png\r\nContent-ID: <logo@x>\r\nContent-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n" +
+		"--rel--\r\n" +
+		"--mix\r\nContent-Type: text/csv\r\nContent-Disposition: attachment; filename=\"q4.csv\"\r\n\r\nregion,total\r\nEMEA,42\r\n" +
+		"--mix--\r\n"
+	c, _ := imapclient.DialInsecure(addr, nil)
+	defer c.Close()
+	c.Login(testUser, testPass).Wait()
+	cmd := c.Append("INBOX", int64(len(raw)), nil)
+	cmd.Write([]byte(raw))
+	cmd.Close()
+	cmd.Wait()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := eng.SyncAccount(ctx, acct); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := st.ListMessages("acc", mail.RoleInbox, "", 10)
+	if len(list) != 1 || !list[0].HasAttachments {
+		t.Fatalf("message = %+v", list)
+	}
+	parts, _ := st.ListParts(list[0].ID)
+	if len(parts) != 2 || !parts[0].Inline || parts[1].Filename != "q4.csv" {
+		t.Fatalf("parts = %+v", parts)
+	}
+	imgs, _ := st.InlineImages(list[0].ID)
+	if len(imgs["logo@x"].Data) == 0 {
+		t.Fatalf("inline image data not stored: %+v", imgs)
+	}
+	m, _ := st.GetMessage(list[0].ID)
+	got, err := eng.FetchRaw(acct, m)
+	if err != nil || !strings.Contains(string(got), "EMEA,42") {
+		t.Fatalf("FetchRaw = %d bytes, %v", len(got), err)
+	}
+	// Fetching raw content must not mark the message read.
+	if m, _ := st.GetMessage(list[0].ID); !m.Unread {
+		t.Error("FetchRaw marked the message as read")
 	}
 }

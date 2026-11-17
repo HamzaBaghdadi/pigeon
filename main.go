@@ -10,12 +10,18 @@ import (
 	"github.com/HamzaBaghdadi/pigeon/services"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
 // The Next.js static export (frontend/dist) is embedded into the binary.
 //
 //go:embed all:frontend/dist
 var assets embed.FS
+
+// Tray icon (multi-size ICO; Windows picks the right size).
+//
+//go:embed build/windows/icon.ico
+var trayIcon []byte
 
 func main() {
 	prefsStore, err := settings.Open()
@@ -37,7 +43,11 @@ func main() {
 	core := services.NewCore(db, prefsStore)
 	mail := services.NewMailService(core)
 	accounts := services.NewAccountService(core)
+	composer := services.NewComposeService(core)
 	settingsSvc := services.NewSettingsService(prefsStore)
+	updates := services.NewUpdateService(prefsStore)
+	notifier := notifications.New()
+	desktop := services.NewDesktop(core, prefsStore, notifier)
 
 	app := application.New(application.Options{
 		Name:        "Pigeon",
@@ -45,7 +55,17 @@ func main() {
 		Services: []application.Service{
 			application.NewService(mail),
 			application.NewService(accounts),
+			application.NewService(composer),
 			application.NewService(settingsSvc),
+			application.NewService(updates),
+			application.NewService(notifier),
+			application.NewService(desktop.Service()),
+		},
+		// One Pigeon at a time: launching it again (or clicking a notification
+		// while it runs) brings the existing window forward.
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID:               "io.github.hamzabaghdadi.pigeon",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) { desktop.Show() },
 		},
 		Assets: application.AssetOptions{
 			Handler:    application.AssetFileServerFS(assets),
@@ -74,6 +94,7 @@ func main() {
 		URL:              "/",
 	})
 	settingsSvc.AttachWindow(window)
+	desktop.Attach(app, window, trayIcon)
 
 	// When Windows switches light/dark, re-apply the user's choice: a forced
 	// light or dark theme must win, and "system" must follow the change.

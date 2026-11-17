@@ -36,6 +36,17 @@ export interface Address {
 }
 
 /**
+ * Attachment describes a file attached to a message (data is fetched on demand).
+ */
+export interface Attachment {
+    "index": number;
+    "filename": string;
+    "contentType": string;
+    "size": number;
+    "inline": boolean;
+}
+
+/**
  * Folder is a mailbox folder or label.
  */
 export interface Folder {
@@ -43,6 +54,11 @@ export interface Folder {
     "accountId": string;
     "name": string;
     "role": FolderRole;
+
+    /**
+     * Path is the server path, e.g. "Work/Projects" (used to show nesting).
+     */
+    "path": string;
     "unread": number;
 }
 
@@ -73,6 +89,7 @@ export interface MessageBody {
     "html": string;
     "text": string;
     "remoteImages": number;
+    "attachments": Attachment[] | null;
 }
 
 /**
@@ -84,6 +101,7 @@ export interface MessageSummary {
     "folderId": string;
     "from": Address;
     "to": Address[] | null;
+    "cc": Address[] | null;
     "subject": string;
     "snippet": string;
     "date": string;

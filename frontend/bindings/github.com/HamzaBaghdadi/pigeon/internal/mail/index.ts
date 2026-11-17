@@ -9,6 +9,7 @@ export {
 export type {
     Account,
     Address,
+    Attachment,
     Folder,
     MessageBody,
     MessageSummary

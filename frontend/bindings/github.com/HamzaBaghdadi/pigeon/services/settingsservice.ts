@@ -39,6 +39,27 @@ export function GetSettings(): $CancellablePromise<settings$0.Settings> {
 }
 
 /**
+ * SetCloseToTray chooses whether closing the window keeps Pigeon running in the tray.
+ */
+export function SetCloseToTray(on: boolean): $CancellablePromise<settings$0.Settings> {
+    return $Call.ByID(2811238112, on);
+}
+
+/**
+ * SetDisplayName sets the name recipients see on mail you send.
+ */
+export function SetDisplayName(name: string): $CancellablePromise<settings$0.Settings> {
+    return $Call.ByID(3806260360, name);
+}
+
+/**
+ * SetNotifications turns new-mail notifications on or off.
+ */
+export function SetNotifications(on: boolean): $CancellablePromise<settings$0.Settings> {
+    return $Call.ByID(2708325517, on);
+}
+
+/**
  * SetTheme saves the appearance choice ("system", "light" or "dark") and
  * updates the native window chrome to match.
  */

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sync/atomic"
 	"path/filepath"
+	"sync/atomic"
 
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no CGO)
 )
@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS folders (
 	path        TEXT NOT NULL,
 	name        TEXT NOT NULL,
 	role        TEXT NOT NULL,
-	uidvalidity INTEGER NOT NULL DEFAULT 0
+	uidvalidity INTEGER NOT NULL DEFAULT 0,
+	floor_uid   INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS folders_account ON folders(account_id);
 
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS messages (
 	from_name       TEXT NOT NULL DEFAULT '',
 	from_email      TEXT NOT NULL DEFAULT '',
 	to_json         TEXT NOT NULL DEFAULT '[]',
+	cc_json         TEXT NOT NULL DEFAULT '[]',
 	subject         TEXT NOT NULL DEFAULT '',
 	snippet         TEXT NOT NULL DEFAULT '',
 	date            INTEGER NOT NULL DEFAULT 0,
@@ -111,10 +113,25 @@ CREATE TABLE IF NOT EXISTS messages (
 	has_attachments INTEGER NOT NULL DEFAULT 0,
 	body_html       TEXT NOT NULL DEFAULT '',
 	body_text       TEXT NOT NULL DEFAULT '',
-	body_fetched    INTEGER NOT NULL DEFAULT 0
+	body_fetched    INTEGER NOT NULL DEFAULT 0,
+	parts_indexed   INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS messages_folder_date ON messages(folder_id, date DESC);
 CREATE INDEX IF NOT EXISTS messages_account ON messages(account_id);
+
+-- Attachments and embedded images. Data is kept only for small inline images;
+-- attachment bytes are fetched from the server when opened or saved.
+CREATE TABLE IF NOT EXISTS parts (
+	message_id   TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	idx          INTEGER NOT NULL,
+	filename     TEXT NOT NULL DEFAULT '',
+	content_type TEXT NOT NULL DEFAULT '',
+	size         INTEGER NOT NULL DEFAULT 0,
+	content_id   TEXT NOT NULL DEFAULT '',
+	inline       INTEGER NOT NULL DEFAULT 0,
+	data         BLOB,
+	PRIMARY KEY (message_id, idx)
+);
 
 -- Full-text search over everything a person would search for.
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
@@ -142,7 +159,16 @@ func (s *Store) migrate() error {
 		return err
 	}
 	// Columns added after the first release.
-	return s.addColumn("accounts", "auth", "TEXT NOT NULL DEFAULT 'password'")
+	if err := s.addColumn("accounts", "auth", "TEXT NOT NULL DEFAULT 'password'"); err != nil {
+		return err
+	}
+	if err := s.addColumn("messages", "cc_json", "TEXT NOT NULL DEFAULT '[]'"); err != nil {
+		return err
+	}
+	if err := s.addColumn("folders", "floor_uid", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	return s.addColumn("messages", "parts_indexed", "INTEGER NOT NULL DEFAULT 0")
 }
 
 func (s *Store) addColumn(table, column, def string) error {

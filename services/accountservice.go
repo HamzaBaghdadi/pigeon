@@ -11,8 +11,8 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	pmail "github.com/HamzaBaghdadi/pigeon/internal/mail"
 	"github.com/HamzaBaghdadi/pigeon/internal/imapsync"
+	pmail "github.com/HamzaBaghdadi/pigeon/internal/mail"
 	"github.com/HamzaBaghdadi/pigeon/internal/providers"
 	"github.com/HamzaBaghdadi/pigeon/internal/secrets"
 	"github.com/HamzaBaghdadi/pigeon/internal/store"
@@ -135,6 +135,7 @@ func (s *AccountService) AddAccount(in AddAccountInput) (pmail.Account, error) {
 // RemoveAccount forgets an account: local mail, settings and saved password.
 // Nothing is deleted on the server.
 func (s *AccountService) RemoveAccount(id string) error {
+	s.core.stopWatcher(id)
 	s.core.engine.Disconnect(id)
 	if err := s.core.store.DeleteAccount(id); err != nil {
 		return err

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Archive, Forward, ImageOff, Mail, MailOpen, Reply, ReplyAll, Star, Trash2 } from "lucide-react";
+import { Archive, FolderInput, Forward, ImageOff, Mail, MailOpen, Reply, ReplyAll, Star, Trash2 } from "lucide-react";
 import { api, errorMessage, type Account, type MessageBody as Body, type MessageSummary } from "@/lib/api";
 import { fullDate, initials } from "@/lib/format";
 import MessageBody from "./MessageBody";
+import Attachments from "./Attachments";
 
 type Props = {
   message: MessageSummary | null;
@@ -13,6 +14,9 @@ type Props = {
   onToggleRead: (m: MessageSummary) => void;
   onArchive: (m: MessageSummary) => void;
   onTrash: (m: MessageSummary) => void;
+  onRespond: (m: MessageSummary, mode: "reply" | "replyAll" | "forward") => void;
+  onMove: (m: MessageSummary) => void;
+  onToast: (text: string, action?: { label: string; run: () => void }, error?: boolean) => void;
 };
 
 export default function Reader(props: Props) {
@@ -28,6 +32,9 @@ function MessageView({
   onToggleRead,
   onArchive,
   onTrash,
+  onRespond,
+  onMove,
+  onToast,
 }: Props & { message: MessageSummary }) {
   const [body, setBody] = useState<Body | null>(null);
   const [allowRemote, setAllowRemote] = useState(false);
@@ -54,6 +61,7 @@ function MessageView({
       <div className="flex h-[52px] shrink-0 items-center gap-0.5 border-b border-border px-3" role="toolbar" aria-label="Message actions">
         <ToolButton icon={Archive} label="Archive" shortcut="E" onClick={() => onArchive(message)} />
         <ToolButton icon={Trash2} label="Delete" shortcut="#" onClick={() => onTrash(message)} />
+        <ToolButton icon={FolderInput} label="Move to folder" shortcut="M" onClick={() => onMove(message)} />
         <Divider />
         <ToolButton
           icon={message.unread ? MailOpen : Mail}
@@ -69,9 +77,9 @@ function MessageView({
           onClick={() => onToggleStar(message)}
         />
         <div className="flex-1" />
-        <ToolButton icon={Reply} label="Reply" shortcut="R" text="Reply" />
-        <ToolButton icon={ReplyAll} label="Reply all" shortcut="A" />
-        <ToolButton icon={Forward} label="Forward" shortcut="F" />
+        <ToolButton icon={Reply} label="Reply" shortcut="R" text="Reply" onClick={() => onRespond(message, "reply")} />
+        <ToolButton icon={ReplyAll} label="Reply all" shortcut="A" onClick={() => onRespond(message, "replyAll")} />
+        <ToolButton icon={Forward} label="Forward" shortcut="F" onClick={() => onRespond(message, "forward")} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -110,6 +118,8 @@ function MessageView({
               {fullDate(message.date)}
             </time>
           </div>
+
+          {body && <Attachments messageId={message.id} attachments={body.attachments ?? []} onToast={onToast} />}
 
           {body && body.remoteImages > 0 && !allowRemote && (
             <div className="mt-5 flex items-center gap-2.5 rounded-md bg-bg px-3 py-2 text-[12.5px] text-muted">

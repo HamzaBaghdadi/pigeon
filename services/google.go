@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	pmail "github.com/HamzaBaghdadi/pigeon/internal/mail"
 	"github.com/HamzaBaghdadi/pigeon/internal/imapsync"
+	pmail "github.com/HamzaBaghdadi/pigeon/internal/mail"
 	"github.com/HamzaBaghdadi/pigeon/internal/oauth"
 	"github.com/HamzaBaghdadi/pigeon/internal/secrets"
 	"github.com/HamzaBaghdadi/pigeon/internal/settings"
@@ -213,6 +213,9 @@ func (s *AccountService) SignInWithGoogle(loginHint, name string) (pmail.Account
 	gmail.Username = res.Email
 	gmail.Auth = store.AuthGoogle
 
+	if s.core.prefs.Get().DisplayName == "" && strings.TrimSpace(res.Name) != "" {
+		_, _ = s.core.prefs.Update(func(v *settings.Settings) { v.DisplayName = strings.TrimSpace(res.Name) })
+	}
 	if err := saveToken(gmail.ID, res.Token); err != nil {
 		return pmail.Account{}, fmt.Errorf("couldn't save the sign-in to Windows Credential Manager: %w", err)
 	}
